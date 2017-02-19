@@ -40,7 +40,7 @@ class HS602(object):
         self.cmd_port = cmd_port or 8087
         self.cmd_len = 15
         self.udp_timeout = udp_timeout or 10
-        self.tcp_timeout = tcp_timeout = 10
+        self.tcp_timeout = tcp_timeout or 10
         self.device_addr = None
         self.socket = None
         
@@ -166,14 +166,10 @@ class HS602(object):
         """The last packet is the total length of the value."""
         end = start + [len(value), 0]
         self.send(bytes(end))
-        
         return True
         
     def toggle_broadcast(self):
         """Tell the box to begin/end streaming."""
         cmd = [15, 0]
         self.send(bytes(cmd))
-        
         return True
-        
-

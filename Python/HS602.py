@@ -114,11 +114,7 @@ class HS602(object):
             raise BrokenPipeError("Failed to send command")
         """Get the response."""
         data = bytes()
-        while True:
-            tmp = self.socket.recv(self.cmd_len)
-            if tmp:
-                data = data + tmp
-            break
+        data = self.socket.recv(self.cmd_len)
         return data
         
     def get_version(self):
@@ -168,7 +164,13 @@ class HS602(object):
         self.send(bytes(end))
         return True
         
-    def toggle_broadcast(self):
+    def is_streaming(self):
+        """Get the current streaming status."""
+        cmd = [15, 1];
+        reply = self.send(bytes(cmd))
+        return bool(reply[0])
+
+    def toggle_streaming(self):
         """Tell the box to begin/end streaming."""
         cmd = [15, 0]
         self.send(bytes(cmd))

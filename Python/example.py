@@ -24,11 +24,16 @@
 import HS602
 
 t = HS602.HS602()
-t.set_string_param("rtmpurl", "rtmp://a.rtmp.youtube.com/live2")
-t.set_string_param("rtmpkey", "password")
+t.set_param("rtmpurl", "rtmp://live.myurl.com")
+t.set_param("rtmpkey", "mystreamkey")
 
 if t.is_streaming():
-    print("The device is streaming.")
+    url = t.get_param("rtmpurl")
+    key = t.get_param("rtmpkey")
+    print("The device is streaming to {} using key \"{}\"". format(url, 
+                                                                key))
 else:
     print("The device is not streaming, will ask it to start.")
     t.toggle_streaming()
+    
+

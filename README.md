@@ -7,6 +7,7 @@ Information and simple scripts to control the HS602 capture device, manufactured
 * [Diamond GameCaster HD "GC2000"](http://www.diamondmm.com/diamond-gc2000-video-capture-edit-stream.html)
 
 ---
+
 ###Connecting to the Device via Serial
 On my device (the Maplin variant) the serial/UART pins are populated. You need a TTL UART converter - I used a "USB 2.0 CP2102 To TTL UART Module 6Pin Serial Converter". 
 
@@ -35,15 +36,17 @@ I plan on writing a PHP version sometime in the future.
 
 ####Python
 
-This is a very limited script at the moment, it's only possible to set the streamurl, key and toggle broadcasting. There is no interface (yet). See example.py for usage.
+This is a very limited script at the moment, it's only possible to set the streamurl, key and toggle broadcasting.  For example usage see web.py.
 
 **Python3.x is required.**
 
 ---
+
 ###Improvements
 
 I'm always happy to receive suggestions, fixes or whatever. 
 
 ---
-####Links
+
+###Links
 [XDA developers' forum thread](https://forum.xda-developers.com/hardware-hacking/hardware/easily-moddable-hdmi-capture-box-t2988451)

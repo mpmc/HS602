@@ -22,6 +22,7 @@
 #
 #
 import socket
+import time
 
 class HS602(object):
 
@@ -234,8 +235,9 @@ class HS602(object):
             value from the box.
 
             Notes:
-                 Changing colour value doesn't seem to work on HDMI
-                 input. I assume it's just for YPbPr input only.
+                I'd previously said color changes didn't have
+                any effect on HDMI output, I was wrong. It does,
+                you just have to set the values BEFORE capturing.
         """
         setting = {"brightness": 0,
                     "contrast": 1,
@@ -356,6 +358,20 @@ class HS602(object):
             raise Exception("Command echo mismatch (toggle streaming)")
         return True
 
+    def unicast(self, keepalive = False):
+        """Start unicast streaming."""
+        cmd = bytes([8, 0, 0])
+        r = self.send(bytes(cmd))
+        """Check for ack."""
+        if not r[:len(cmd)] == cmd:
+            raise Exception("Command echo mismatch (toggle streaming)")
+        """ Hack to keep stream alive."""
+        if keepalive:
+            while True:
+                r = self.send(bytes([0]))
+                time.sleep(8)
+        return True
+
     def size(self, height = None, width = None):
         """Get/Set size.
 
@@ -382,10 +398,15 @@ class HS602(object):
             if width < 480 or width > 1920:
                 width = 1920
             """Build the command."""
-            cmd = bytes(cmd + [0, width & 255, (width >> 8) & 255,
-                           (width >> 16) & 255, (width >> 24) & 255,
-                            height & 255, (height >> 8) & 255,
-                            (height >> 16) & 255, (height >> 24) & 255])
+            cmd = bytes(cmd + [0, 
+                               width & 255, 
+                               (width >> 8) & 255,
+                               (width >> 16) & 255,
+                               (width >> 24) & 255,
+                               height & 255, 
+                               (height >> 8) & 255,
+                               (height >> 16) & 255,
+                               (height >> 24) & 255])
             """Send and get the response."""
             r = self.send(cmd)
             """Make sure the box echos our command back."""
@@ -400,7 +421,7 @@ class HS602(object):
         width = int((((r[4] & 255) + ((r[5] & 255) << 8)) +
                 ((r[6] & 255) << 16)) + ((r[7] & 255) << 24))
         """Make sure they're sane."""
-        if height < 0 or height > 1080 or width < 0 or width > 1920:
+        if height < 0 or width < 0:
             raise Exception("Box returned invalid size values")
         """Return a tuple of values."""
         return height, width
@@ -419,8 +440,8 @@ class HS602(object):
             """Make sure value is int & in range."""
             value = int(value)
             if not value > 0 or value > 8000:
-                """The default values on a reboot
-                   are avg = 15000, min = 18000 highest = 13000.
+                """The default values on a reboot are avg = 15000,
+                   min = 18000 highest = 13000.
 
                    These kinda feel backwards but anything higher and
                    the box screws up royally. Just use safe values.
@@ -443,7 +464,7 @@ class HS602(object):
                     lowest & 255, (lowest >> 8) & 255,
                     (lowest >> 16) & 255, (lowest >> 24) & 255,
                     highest & 255, (highest >> 8) & 255,
-                    (highest >> 16) & 255, (highest & 24) & 255]
+                    (highest >> 16) & 255, (highest >> 24) & 255]
             """Send values!"""
             cmd = bytes(cmd)
             r = self.send(cmd)

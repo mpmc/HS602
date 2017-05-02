@@ -27,11 +27,12 @@ from bottle import route, run, template, static_file, response
 from json import dumps
 from HS602 import HS602
 from time import time
+box = HS602()
 """JSON status."""
 @route('/status')
+@route('/')
 def status():
     """Load and display details from device."""
-    box = HS602()
     streaming = box.is_streaming()
     size = box.size()
     source = box.source(None, True)
@@ -48,6 +49,16 @@ def status():
                'size': {'height': size[0], 'width': size[1]}}
     response.content_type = 'application/json'
     return dumps(content)
+
+@route('/toggle')
+def toggle():
+    box.toggle_streaming()
+    status = box.is_streaming()
+    content = {'is_streaming': status,
+               'time': int(time())}
+    response.content_type = 'application/json'
+    return dumps(content)
+
 """Run!"""
 if __name__ == '__main__':
     run(host='localhost', port=8080)

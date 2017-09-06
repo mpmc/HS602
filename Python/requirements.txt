@@ -1,3 +1,0 @@
-# Minimal requirements for HS602 web interface.
-# Just bottle!
-bottle >= 0.12

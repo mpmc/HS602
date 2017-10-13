@@ -25,7 +25,7 @@ from setuptools import setup
 setup(
     name='hs602',
     packages=['hs602'],
-    version='0.1.1.dev1',
+    version='0.1.1.dev2',
     description='A Simple HS602 controller',
     author='Mark Clarkstone',
     author_email='git@markclarkstone.co.uk',

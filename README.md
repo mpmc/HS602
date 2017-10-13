@@ -1,6 +1,6 @@
 # HS602
 
-Information and simple scripts/libs to control the HS602 capture device, manufactured by "maxmediatek" and sold under many different names/brands.
+Information and simple Python scripts/libs to control the HS602 capture device, manufactured by "maxmediatek" and sold under many different names/brands.
 
 * [Maplin Game Capture HD](http://www.maplin.co.uk/p/maplin-game-capture-hd-a84qu)  ("discontinued").
 * [Startech USB2HDCAPS](https://www.startech.com/uk/AV/Converters/Video/standalone-video-capture-device~USB2HDCAPS)
@@ -27,23 +27,14 @@ If you want to be extra careful **don't** connect the VCC (5V) wire & use the US
 Use your favourite software to connect at 115200 baud/speed with parity set to EVEN (this is listed under serial in PuTTY).
 
 
-## Supported Languages
-
-Note, there is a chance that features may differ depending on the language used. 
-
-**Python3**
+## Features
 
 * Can be used to control a HS602 encoder over the Internet. Although I wouldn't recommend it, it's too insecure! 
 * Simple and easy to understand class methods.
 * Versions 0.1.1>= are PEP8 compliant.
 * Minimal requirements, uses a single import (socket).
 
-**PHP**
-Coming soon.
-
 ## Install
-
-**Python3**
 
 ```
 git clone http://github.com/mpmc/HS602.git
@@ -53,7 +44,7 @@ pip3 install --user .
 
 ## Usage
 
-See the examples files for usage.
+See example.py.
 
 ## Features
 
@@ -66,7 +57,7 @@ Almost all the features of the Windows Shareview application.
 
 ## Improvements?
 
-* I'm In the process of writing a cross-platform app (in Python) using the fantastic [appJar](http://github.com/jarvisteach/appjar).
+* I'm In the process of writing a cross-platform app using the fantastic [appJar](http://github.com/jarvisteach/appjar).
 
 I'm always happy to receive suggestions, fixes or whatever. 
 

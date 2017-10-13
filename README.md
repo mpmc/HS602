@@ -37,10 +37,11 @@ Use your favourite software to connect at 115200 baud/speed with parity set to E
 ## Install
 
 ```
-git clone http://github.com/mpmc/HS602.git
-cd HS602/Python/hs602
-pip3 install --user .
+pip3 install --user git+git://github.com/mpmc/HS602.git@master
 ```
+
+* Remove --user to install globally (requires root or sudo).
+* Upgrade by running ```pip3 install --user --upgrade hs602```
 
 ## Usage
 

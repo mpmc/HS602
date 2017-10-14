@@ -30,25 +30,27 @@ class Controller(object):
     def __init__(self, **kwargs):
         """To override the defaults, pass the following as keyword args:
 
-           :param addr: Address of device.
-           :param udp: UDP broadcast port.
-           :param tcp: TCP command port.
-           :param timeout: Socket timeout. Don't set this to 0 or None.
-           :param ping: Message to trigger pong reply.
-           :param pong: Expected pong response.
-           :param encoding: Message encoding.
-           :param cmd_len: Command length. Don't set this to 0 or None.
+        :param addr: Address of device.
+        :param udp: UDP broadcast port.
+        :param tcp: TCP command port.
+        :param timeout: Socket timeout. Don't set this to 0 or None.
+        :param ping: Message to trigger pong reply.
+        :param pong: Expected pong response.
+        :param encoding: Message encoding.
+        :param cmd_len: Command length. Don't set this to 0 or None.
 
 
-           If addr isn't set and a method is used, discover() will be
-           called automatically, the first device found is used.
+        If addr isn't set and a method is used, discover() will be
+        called automatically, the first device found is used.
 
-           And I'll repeat this again ;), do not set timeout or
-           cmd_len to zero (or None).
+        And I'll repeat this again ;), do not set timeout or
+        cmd_len to zero (or None).
 
-           All sockets are blocking!
+        All sockets are blocking!
         """
         # Required class attributes and their defaults.
+        self.addr = None
+        self.socket = None
         self.defaults = {
             'addr': '<broadcast>',
             'udp': 8086,
@@ -62,9 +64,6 @@ class Controller(object):
         for key, value in self.defaults.items():
             setattr(self, key, kwargs.get(key, value))
 
-        # Socket.
-        self.socket = None
-
         # For colour/color.
         self.color = self.colour
         self.color_set = self.colour_set
@@ -72,11 +71,11 @@ class Controller(object):
     def udp_msg(self, msg, reply=True):
         """Send UDP message.
 
-           :param msg: Message (in bytes) to send.
-           :param reply: Do we want to wait for a reply?
+        :param msg: Message (in bytes) to send.
+        :param reply: Do we want to wait for a reply?
 
-           Returns a list of replies, an empty list is returned if
-           nothing is received.
+        Return a list of replies, an empty list is returned if
+        nothing is received.
         """
         msg = bytes(msg)
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -108,7 +107,7 @@ class Controller(object):
     def discover(self):
         """Sends ping to self.addr to see who pongs back.
 
-           Returns a list of addresses that respond correctly.
+        Return a list of addresses that respond correctly.
         """
         # Ping/Pong messages should be in bytes with an encoding.
         # Make a (silent) attempt to convert, if that fails use as is.
@@ -124,11 +123,11 @@ class Controller(object):
     def cmd(self, msg, reply=True):
         """Send command to device.
 
-           :param msg: Message (in bytes) to send.
-           :param reply: Do we want to wait for a reply?
+        :param msg: Message (in bytes) to send.
+        :param reply: Do we want to wait for a reply?
 
-           Returns the reply from the box, or True if
-           message was sent without error (if no reply needed).
+        Return the reply. True if
+        message was sent without error (when no reply needed).
         """
         msg = bytes(msg)
         # Do we need to discover a device first?
@@ -162,11 +161,11 @@ class Controller(object):
         return data
 
     def pad(self, data, pad_len=None):
-        """Returns data appended with zero bytes to the size of pad_len.
+        """Return data appended with zero bytes to the size of pad_len.
 
-           :param data: data to pad, can be anything that can be
-           converted to bytes.
-           :param pad_len: Size required, don't set to use self.cmd_len.
+        :param data: data to pad, can be anything that can be
+        converted to bytes.
+        :param pad_len: Size required, don't set to use self.cmd_len.
         """
         pad_len = pad_len or self.cmd_len
         data = bytes(data)
@@ -174,10 +173,10 @@ class Controller(object):
         return data
 
     def echo(self, first, second):
-        """Returns true if first and second match.
+        """Return True if first and second match.
 
-           :param first: First object.
-           :param second: Second object.
+        :param first: First object.
+        :param second: Second object.
         """
         if first == second:
             return True
@@ -188,7 +187,7 @@ class Controller(object):
         return self.cmd(cmd, False)
 
     def streaming_toggle(self):
-        """Returns current streaming toggle status (True or False)."""
+        """Return current streaming toggle status (True or False)."""
         cmd = self.pad([15, 1])
         return bool(self.cmd(cmd)[0] & 255)
 
@@ -200,11 +199,11 @@ class Controller(object):
         return self.echo(cmd, self.cmd(cmd))
 
     def opts(self, opt):
-        """Returns option parameter dict.
+        """Return option parameter dict.
 
-           :param opt: Options to return.
+        :param opt: Options to return.
 
-           To return the full dict, set opt to None.
+        To return the full dict, set opt to None.
         """
         opt_dict = {
             'rtmp': {
@@ -285,9 +284,9 @@ class Controller(object):
     def rtmp(self, param):
         """Get RTMP value.
 
-           :param param: See opts('rtmp').
+        :param param: See opts('rtmp').
 
-           Returns the RTMP value currently used by the device (str).
+        Return the RTMP value currently used by the device (str).
         """
         opt = self.opts('rtmp')
         cmd = [opt[param.lower()], 1]
@@ -305,8 +304,8 @@ class Controller(object):
     def rtmp_set(self, param, value):
         """Set RTMP values.
 
-           :param param: See opts('rtmp').
-           :param value: Value to set, max length 255.
+        :param param: See opts('rtmp').
+        :param value: Value to set, max length 255.
         """
         opt = self.opts('rtmp')
         cmd = [opt[param.lower()], 0]
@@ -328,9 +327,9 @@ class Controller(object):
     def colour(self, param):
         """Get colour parameter value.
 
-           :param param: See opts('colour').
+        :param param: See opts('colour').
 
-           Returns "param" value as int (0-255).
+        Return "param" value as int (0-255).
         """
         opt = self.opts('colour')
         # What colour param?
@@ -341,8 +340,8 @@ class Controller(object):
     def colour_set(self, param, value):
         """Set colour parameter value.
 
-           :param param: See opts('colour')
-           :param value: Value to set, 0 - 255.
+        :param param: See opts('colour')
+        :param value: Value to set, 0 - 255.
         """
         opt = self.opts('colour')
         # What colour param?
@@ -352,9 +351,9 @@ class Controller(object):
     def source(self, text=False):
         """Returns current input source.
 
-           :param text: Return text value?
+        :param text: Return text value?
 
-           Returns int (2 or 3) or text representation if text is True.
+        Returns int (2 or 3) or text representation if text is True.
         """
         cmd = self.pad([1, 1])
         inputs = self.opts('source')
@@ -366,7 +365,7 @@ class Controller(object):
     def source_set(self, source):
         """Set source.
 
-           :param source: See opts('source').
+        :param source: See opts('source').
         """
         cmd = self.pad([1, 0, source & 255])
         return bool(self.cmd(cmd)[0] & 255)
@@ -374,9 +373,9 @@ class Controller(object):
     def resolution(self, text=False):
         """Returns the currently-reported input resolution.
 
-           :param text: Return text value?
+        :param text: Return text value?
 
-           Returns int or text representation if text is True.
+        Returns int or text representation if text is True.
         """
         modes = self.opts('resolution')
         cmd = self.pad([4, 1])
@@ -388,8 +387,8 @@ class Controller(object):
         return result
 
     def size(self):
-        """Returns current (output) picture size as a height, width
-           tuple.
+        """Return current (output) picture size as a height, width
+        tuple.
         """
         cmd = self.pad([3, 1])
         result = self.cmd(cmd)
@@ -410,8 +409,8 @@ class Controller(object):
     def size_set(self, height, width):
         """Set picture size.
 
-           :param height: Picture height.
-           :param width: Picture width.
+        :param height: Picture height.
+        :param width: Picture width.
         """
         height = [
             height & 255,
@@ -429,7 +428,7 @@ class Controller(object):
         return self.echo(cmd, self.cmd(cmd))
 
     def bitrate(self):
-        """Returns current streaming bitrate (int)."""
+        """Return current streaming bitrate (int)."""
         cmd = self.pad([2, 1])
         result = self.cmd(cmd)
         # This is split like this to make it less ugly (still is).
@@ -440,7 +439,7 @@ class Controller(object):
     def bitrate_set(self, average):
         """Set the bitrate.
 
-           :param average: The average bitrate to use.
+        :param average: The average bitrate to use.
         """
         average = int(average)
         average = average if average >= 500 else 500
@@ -467,4 +466,3 @@ class Controller(object):
         ]
         cmd = self.pad([2, 0] + average + low + high)
         return self.echo(cmd, self.cmd(cmd))
-

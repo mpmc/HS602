@@ -31,7 +31,7 @@ setup(
     author_email='git@markclarkstone.co.uk',
     url='https://github.com/mpmc/hs602',
     license='GPL-3.0',
-    python_requires='>=3.2',
+    python_requires='>=3.3',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Other Audience',

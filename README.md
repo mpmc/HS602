@@ -36,6 +36,8 @@ Use your favourite software to connect at 115200 baud/speed with parity set to E
 
 ## Install
 
+**Python 3.3 or newer required.**
+
 ```
 pip3 install --user git+git://github.com/mpmc/HS602.git@master
 ```

@@ -186,6 +186,15 @@ class Controller(object):
         cmd = self.pad([0])
         return self.cmd(cmd, False)
 
+    def close(self):
+        """Kill the connection."""
+        try:
+            self.socket.shutdown(socket.SHUT_RDWR)
+            self.socket.close()
+        except OSError as exc:
+            pass
+        self.socket = None
+
     def streaming_toggle(self):
         """Return current streaming toggle status (True or False)."""
         cmd = self.pad([15, 1])
@@ -387,7 +396,7 @@ class Controller(object):
         return result
 
     def size(self):
-        """Return current (output) picture size as a height, width
+        """Return current (output) picture size as a width, height
         tuple.
         """
         cmd = self.pad([3, 1])
@@ -404,9 +413,9 @@ class Controller(object):
             (result[6] & 255) << 16 +
             (result[7] & 255) << 24
         )
-        return height, width
+        return width, height
 
-    def size_set(self, height, width):
+    def size_set(self, width, height):
         """Set picture size.
 
         :param height: Picture height.
@@ -424,7 +433,7 @@ class Controller(object):
             (width >> 16) & 255,
             (width >> 24) & 255,
         ]
-        cmd = self.pad([3, 0] + height + width)
+        cmd = self.pad([3, 0] + width + height)
         return self.echo(cmd, self.cmd(cmd))
 
     def bitrate(self):

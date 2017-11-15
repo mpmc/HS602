@@ -1,12 +1,12 @@
 # HS602
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/b1ee4a339ae24f919f12cee209f3bec0)](https://www.codacy.com/app/hello_58/HS602?utm_source=github.com&utm_medium=referral&utm_content=mpmc/HS602&utm_campaign=badger)
-
 Information and Python module (and soon a GUI) to control the HS602 capture device, manufactured by "maxmediatek" and sold under many different names/brands.
 
 * [Maplin Game Capture HD](http://www.maplin.co.uk/p/maplin-game-capture-hd-a84qu)  ("discontinued").
 * [Startech USB2HDCAPS](https://www.startech.com/uk/AV/Converters/Video/standalone-video-capture-device~USB2HDCAPS)
 * [Diamond GameCaster HD "GC2000"](http://www.diamondmm.com/diamond-gc2000-video-capture-edit-stream.html)
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/b1ee4a339ae24f919f12cee209f3bec0)](https://www.codacy.com/app/hello_58/HS602?utm_source=github.com&utm_medium=referral&utm_content=mpmc/HS602&utm_campaign=badger)
 
 ## Features
 

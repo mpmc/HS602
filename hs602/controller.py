@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 #  controller.py
@@ -22,11 +22,13 @@
 #
 #
 import socket
+import gettext
+
+gettext.install('Hs602controller')
 
 
 class Controller(object):
-    """HS602-T controller."""
-
+    """HS602 Controller"""
     def __init__(self, **kwargs):
         """To override the defaults, pass the following as keyword args:
 
@@ -38,183 +40,30 @@ class Controller(object):
         :param pong: Expected pong response.
         :param encoding: Message encoding.
         :param cmd_len: Command length. Don't set this to 0 or None.
-
-
-        If addr isn't set and a method is used, discover() will be
-        called automatically, the first device found is used.
-
-        And I'll repeat this again ;), do not set timeout or
-        cmd_len to zero (or None).
-
-        All sockets are blocking!
         """
-        # Required class attributes and their defaults.
-        self.addr = None
-        self.socket = None
-        self.defaults = {
-            'addr': '<broadcast>',
-            'udp': 8086,
-            'tcp': 8087,
-            'timeout': 10,
-            'ping': 'HS602',
-            'pong': 'YES',
-            'encoding': 'utf-8',
-            'cmd_len': 15,
-        }
-        for key, value in self.defaults.items():
-            setattr(self, key, kwargs.get(key, value))
+        # Defaults.
+        self.__addr_broadcast = '<broadcast>'
+        self._addr = self.__addr_broadcast
+        self._udp = 8086
+        self._tcp = 8087
+        self._timeout = 10
+        self._ping = 'HS602'
+        self._pong = 'YES'
+        self._encoding = 'utf-8'
+        self._cmd_len = 15
+        self.__socket = None
 
-        # For colour/color.
-        self.color = self.colour
-        self.color_set = self.colour_set
+        # Allow kwargs override.
+        for key, value in kwargs.items():
+            if hasattr(self, "_{}".format(key)):
+                func = getattr(self, "{}_set".format(key))
+                func(value)
 
-    def udp_msg(self, msg, reply=True):
-        """Send UDP message.
-
-        :param msg: Message (in bytes) to send.
-        :param reply: Do we want to wait for a reply?
-
-        Return a list of replies, an empty list is returned if
-        nothing is received.
+    @staticmethod
+    def _properties_get():
+        """Dictionary containing command properties (nested dictionary).
         """
-        msg = bytes(msg)
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.settimeout(self.timeout)
-            s.bind(('', self.udp))
-
-            replies = []
-            while True:
-                # Send message.
-                if msg:
-                    sent = s.sendto(msg, (self.addr, self.udp))
-                    if not sent > 0:
-                        break
-                    msg = msg[sent:]
-                    continue
-
-                # Receive message?
-                if not reply:
-                    return True
-                try:
-                    data, [addr, port] = s.recvfrom(2048)
-                    replies += [[addr, port, data]]
-                except socket.timeout:
-                    break
-            return replies
-
-    def discover(self):
-        """Sends ping to self.addr to see who pongs back.
-
-        Return a list of addresses that respond correctly.
-        """
-        # Ping/Pong messages should be in bytes with an encoding.
-        # Make a (silent) attempt to convert, if that fails use as is.
-        try:
-            self.ping, self.pong = [self.ping.encode(self.encoding),
-                                    self.pong.encode(self.encoding)]
-        except UnicodeError:
-            pass
-        replies = self.udp_msg(self.ping)
-        if replies:
-            return [rep[0] for rep in replies if rep[2] == self.pong]
-
-    def cmd(self, msg, reply=True):
-        """Send command to device.
-
-        :param msg: Message (in bytes) to send.
-        :param reply: Do we want to wait for a reply?
-
-        Return the reply. True if
-        message was sent without error (when no reply needed).
-        """
-        msg = bytes(msg)
-        # Do we need to discover a device first?
-        if self.addr.lower() == self.defaults['addr'].lower():
-            self.addr = self.discover()[0]
-        # If there is no connection, so tell the device to
-        # get ready to accept one.
-        #
-        # This is just the the "C" char and the IP address of the
-        # box in reverse.
-        if not self.socket:
-            ip = reversed(self.addr.split('.'))
-            cmd = [67] + [int(octal) for octal in ip]
-            self.udp_msg(cmd, False)
-            addr = (self.addr, self.tcp)
-            self.socket = socket.create_connection(addr, self.timeout)
-
-        # Send it & get replies (if needed).
-        self.socket.sendall(msg)
-        if not reply:
-            return True
-        data = bytes()
-        while True:
-            buf = self.socket.recv(self.cmd_len)
-            if not buf:
-                self.socket = None
-                break
-            data += buf
-            if len(data) == self.cmd_len:
-                break
-        return data
-
-    def pad(self, data, pad_len=None):
-        """Return data appended with zero bytes to the size of pad_len.
-
-        :param data: data to pad, can be anything that can be
-        converted to bytes.
-        :param pad_len: Size required, don't set to use self.cmd_len.
-        """
-        pad_len = pad_len or self.cmd_len
-        data = bytes(data)
-        data = data.ljust(pad_len, b'\0')
-        return data
-
-    def echo(self, first, second):
-        """Return True if first and second match.
-
-        :param first: First object.
-        :param second: Second object.
-        """
-        if first == second:
-            return True
-
-    def keepalive(self):
-        """Send a keep-alive message."""
-        cmd = self.pad([0])
-        return self.cmd(cmd, False)
-
-    def close(self):
-        """Kill the connection."""
-        try:
-            self.socket.shutdown(socket.SHUT_RDWR)
-            self.socket.close()
-        except OSError as exc:
-            pass
-        self.socket = None
-
-    def streaming_toggle(self):
-        """Return current streaming toggle status (True or False)."""
-        cmd = self.pad([15, 1])
-        return bool(self.cmd(cmd)[0] & 255)
-
-    def streaming_toggle_set(self):
-        """Toggle start/stop streaming. Returns True if successful or
-           False on error.
-        """
-        cmd = self.pad([15, 0])
-        return self.echo(cmd, self.cmd(cmd))
-
-    def opts(self, opt):
-        """Return option parameter dict.
-
-        :param opt: Options to return.
-
-        To return the full dict, set opt to None.
-        """
-        opt_dict = {
+        values = {
             'rtmp': {
                 'url': 16,
                 'key': 17,
@@ -277,130 +126,548 @@ class Controller(object):
                 42: '1680x1050 60Hz',
             },
         }
+        # Color/Colour workaround.
+        values['color'] = values['colour']
+        return values
 
-        # Return the full list?
-        if not opt:
-            return opt_dict
+    properties = property(_properties_get)
 
-        opt = opt.lower()
+    @staticmethod
+    def _valid_str(value):
+        """Return true if string value is 1-255 in length."""
+        value = str(value)
+        if len(value) in range(1, 256):
+            return True
+        raise ValueError(_('invalid value, requires a string of 1-255 '
+                           'in length'))
 
-        # Color/Colour
-        if opt == 'color':
-            opt = 'colour'
+    @staticmethod
+    def _valid_int(value):
+        """Return true if int value is 1-255."""
+        value = int(value)
+        if value in range(1, 256):
+            return True
+        raise ValueError(_('invalid value, requires a number between '
+                           '1 and 255'))
 
-        return opt_dict[opt]
+    @staticmethod
+    def _valid_port(value):
+        """Return true if port int value is 1-65535."""
+        value = int(value)
+        if value in range(1, 65536):
+            return True
+        raise ValueError(_('invalid value, requires a port number '
+                           'between 1 and 65535'))
 
-    def rtmp(self, param):
-        """Get RTMP value.
+    @staticmethod
+    def _echo(first, second):
+        """Check if two variables are equal.
 
-        :param param: See opts('rtmp').
-
-        Return the RTMP value currently used by the device (str).
+        :param first: first object.
+        :param second: second object.
         """
-        opt = self.opts('rtmp')
+        return first == second
+
+    def _addr_get(self):
+        """Device address (string).
+
+        Setting a value will kill existing sockets.
+        """
+        return str(self._addr)
+
+    def _addr_set(self, value):
+        """Set device address - will kill existing sockets.
+
+        :param value: device (or broadcast) address to set.
+        """
+        self._addr = str(value)
+        # Close any existing sockets if addr is set.
+        self._close()
+
+    addr = property(_addr_get, _addr_set)
+
+    def _udp_get(self):
+        """UDP broadcast port, 1-65535 (integer).
+
+        Setting a value will kill existing sockets.
+        """
+        return int(self._udp)
+
+    def _udp_set(self, value):
+        """Set UDP broadcast port - will kill existing sockets.
+
+        :param value: UDP to broadcast on, uses default if not 1-65535.
+        """
+        if not self._valid_port(value):
+            return
+        self._udp = int(value)
+        # Close any existing sockets if udp is set.
+        self._close()
+
+    udp = property(_udp_get, _udp_set)
+
+    def _tcp_get(self):
+        """TCP command port, 1-65535 (integer).
+
+        Setting a value will kill existing sockets.
+        """
+        return int(self._tcp)
+
+    def _tcp_set(self, value):
+        """Set TCP command port - will kill existing sockets.
+
+        :param value: TCP command port, uses default if not 1-65535.
+        """
+        if not self._valid_port(value):
+            return
+        self._udp = int(value)
+        # Close any existing sockets if tcp is set.
+        self._close()
+
+    tcp = property(_tcp_get, _tcp_set)
+
+    def _timeout_get(self):
+        """Socket timeout, 1-255 (integer)."""
+        return int(self._timeout)
+
+    def _timeout_set(self, value):
+        """Set socket timeout.
+
+        :param value: timeout value 1-255.
+        """
+        if not self._valid_int(value):
+            return
+        self._udp = int(value)
+
+    timeout = property(_timeout_get, _timeout_set)
+
+    def _cmd_len_get(self):
+        """Command length (integer)."""
+        return int(self._cmd_len)
+
+    def _cmd_len_set(self, value):
+        """Set expected command length.
+
+        :param value: command length.
+        """
+        self._cmd_len = int(value)
+
+    cmd_len = property(_cmd_len_get, _cmd_len_set)
+
+    def _encoding_get(self):
+        """Message encoding (string)."""
+        return str(self._encoding)
+
+    def _encoding_set(self, value):
+        """Set message encoding.
+
+        :param value: encoding value.
+        """
+        self._encoding = str(value)
+
+    encoding = property(_encoding_get, _encoding_set)
+
+    def _ping_get(self):
+        """Ping trigger message (string)."""
+        return str(self._ping).encode(self.encoding)
+
+    def _ping_set(self, value):
+        """Set ping trigger message.
+
+        :param value: ping value.
+        """
+        self._ping = str(value)
+
+    ping = property(_ping_get, _ping_set)
+
+    def _pong_get(self):
+        """Expected pong reply (string)."""
+        return str(self._pong).encode(self.encoding)
+
+    def _pong_set(self, value):
+        """Set pong reply.
+
+        :param value: expected pong reply.
+        """
+        self._pong = str(value)
+
+    pong = property(_pong_get, _pong_set)
+
+    def _pad(self, data, pad_len=None):
+        """Append data with zero bytes to the size of pad_len.
+
+        :param data: data to pad, can be anything that can be
+        converted to bytes.
+        :param pad_len: size required, if not set will use self.cmd_len.
+        """
+        pad_len = pad_len or self.cmd_len
+        data = bytes(data)
+        data = data.ljust(pad_len, b'\0')
+        return data
+
+    def _udp_msg(self, msg, reply=True):
+        """Send UDP message.
+
+        Return a list of replies, an empty list is returned if
+        nothing is received.
+
+        :param msg: message (in bytes) to send.
+        :param reply: do we want to wait for a reply?
+        """
+        msg = bytes(msg)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            s.settimeout(self._timeout_get())
+            s.bind(('', self._udp_get()))
+
+            replies = list()
+            while True:
+                # Send message.
+                if msg:
+                    sent = s.sendto(msg, (self._addr_get(),
+                                          self._udp_get()))
+                    if not sent > 0:
+                        break
+                    msg = msg[sent:]
+                    continue
+
+                # Receive message?
+                if not reply:
+                    return True
+                try:
+                    data, [addr, port] = s.recvfrom(2048)
+                    replies += [[addr, port, data]]
+                except socket.timeout:
+                    break
+            return replies
+
+    def _cmd(self, msg, reply=True):
+        """Send command to device - If no address is set
+        self.devices_get() will be called & the first device to reply
+        is used.
+
+        Return the reply. true if message was sent without error
+        (when no reply needed).
+
+        :param msg: message (in bytes) to send.
+        :param reply: do we want to wait for a reply?
+        """
+        msg = bytes(msg)
+        # Do we need to discover a device first?
+        addr = self._addr_get()
+        if not addr or addr.lower() == self.__addr_broadcast.lower():
+            self._addr_set(self._devices_get()[0])
+        # If there is no connection, so tell the device to
+        # get ready to accept one.
+        #
+        # This is just the the "C" char and the IPv4 address of the
+        # box in reverse.
+        if not self.__socket:
+            ip = reversed(self._addr_get().split('.'))
+            cmd = [67] + [int(octal) for octal in ip]
+            self._udp_msg(cmd, False)
+            addr = (self._addr_get(), self._tcp_get())
+            addr = addr, self._timeout_get()
+            self.__socket = socket.create_connection(*addr)
+
+        # Send it & get replies (if needed).
+        self.__socket.sendall(msg)
+        if not reply:
+            return True
+        data = bytes()
+        while True:
+            buf = self.__socket.recv(self._cmd_len_get())
+            if not buf:
+                self._close()
+                break
+            data += buf
+            if len(data) == self._cmd_len_get():
+                break
+        return data
+
+    def _close(self):
+        """Kill the connection."""
+        try:
+            # If this fails we can ignore it.
+            self.__socket.shutdown(socket.SHUT_RDWR)
+            self.__socket.close()
+        except (OSError, AttributeError):
+            pass
+        self.__socket = None
+
+    def _devices_get(self):
+        """Discovered devices (list).
+
+        Return a list of devices (even if none are found).
+        This will send a ping to self.addr:self.udp) & wait for
+        replies, it will block until timeout is reached.
+        """
+        res = self._udp_msg(self._ping_get())
+        if res:
+            return [rep[0] for rep in res if rep[2] == self._pong_get()]
+
+    devices = property(_devices_get)
+
+    def _rtmp_get(self, param):
+        """Get an RTMP value.
+
+        :param param: see _properties_get()['rtmp'].
+        """
+        opt = self._properties_get()['rtmp']
         cmd = [opt[param.lower()], 1]
         index = 0
         buf = ''
         while index < 254:
-            result = self.pad(cmd + [index])
-            dec = int(self.cmd(result)[0] & 255)
+            result = self._pad(cmd + [index])
+            dec = int(self._cmd(result)[0] & 255)
             if dec == 0:
                 break
             buf += chr(dec)
             index += 1
         return buf
 
-    def rtmp_set(self, param, value):
+    def _rtmp_set(self, param, value):
         """Set RTMP values.
 
-        :param param: See opts('rtmp').
-        :param value: Value to set, max length 255.
+        :param param: see _properties_get()['rtmp'].
+        :param value: value to set, max length 255.
         """
-        opt = self.opts('rtmp')
+        opt = self._properties_get()['rtmp']
         cmd = [opt[param.lower()], 0]
         # Too long?
-        if len(value) > 255 or len(value) == 0:
-            raise ValueError
+        if not self._valid_str(value):
+            return
 
         # Send each char.
         for index, char in enumerate(value):
-            char_cmd = self.pad(cmd + [index, ord(char)])
+            char_cmd = self._pad(cmd + [index, ord(char)])
             # Ack?
-            if not self.echo(char_cmd, self.cmd(char_cmd)):
+            if not self._echo(char_cmd, self._cmd(char_cmd)):
                 return
 
         # Finally, send the total length.
-        cmd = self.pad(cmd + [len(value), 0])
-        return self.echo(cmd, self.cmd(cmd))
+        cmd = self._pad(cmd + [len(value), 0])
+        return self._echo(cmd, self._cmd(cmd))
 
-    def colour(self, param):
+    def _url_get(self):
+        """RTMP URL, length 1-255 (string)."""
+        return self._rtmp_get('url')
+
+    def _url_set(self, value):
+        """Set RTMP URL on device.
+
+        :param value: URL to set - length must be 1-255.
+        """
+        if not self._valid_str(value):
+            return
+        return self._rtmp_set('url', value)
+
+    url = property(_url_get, _url_set)
+
+    def _key_get(self):
+        """RTMP key, length 1-255 (string)."""
+        return self._rtmp_get('key')
+
+    def _key_set(self, value):
+        """Set RTMP key on device.
+
+        :param value: key to set - length must be 1-255.
+        """
+        if not self._valid_str(value):
+            return
+        return self._rtmp_set('key', value)
+
+    key = property(_key_get, _key_set)
+
+    def _username_get(self):
+        """RTMP username, length 1-255 (string)."""
+        return self._rtmp_get('username')
+
+    def _username_set(self, value):
+        """Set RTMP username on device.
+
+        :param value: Username to set - length must be 1-255.
+        """
+        if not self._valid_str(value):
+            return
+        return self._rtmp_set('username', value)
+
+    username = property(_username_get, _username_set)
+
+    def _password_get(self):
+        """RTMP password, length 1-255 (string)."""
+        return self._rtmp_get('password')
+
+    def _password_set(self, value):
+        """Set RTMP password on device.
+
+        :param value: password to set - length must be 1-255.
+        """
+        if not self._valid_str(value):
+            return
+        return self._rtmp_set('password', value)
+
+    password = property(_password_get, _password_set)
+
+    def _colour_get(self, param):
         """Get colour parameter value.
 
-        :param param: See opts('colour').
-
-        Return "param" value as int (0-255).
+        :param param: see _properties_get()['colour'].
         """
-        opt = self.opts('colour')
+        opt = self._properties_get()['colour']
         # What colour param?
-        cmd = self.pad([10, 1, opt[param.lower()]])
-        result = int(self.cmd(cmd)[0] & 255)
+        cmd = self._pad([10, 1, opt[param.lower()]])
+        result = int(self._cmd(cmd)[0] & 255)
         return result
 
-    def colour_set(self, param, value):
+    def _colour_set(self, param, value):
         """Set colour parameter value.
 
-        :param param: See opts('colour')
-        :param value: Value to set, 0 - 255.
+        :param param: see properties_get()['colour']
+        :param value: value to set, 0 - 255.
         """
-        opt = self.opts('colour')
+        opt = self._properties_get()['colour']
         # What colour param?
-        cmd = self.pad([10, 0, opt[param.lower()], value & 255])
-        return self.echo(cmd, self.cmd(cmd))
+        cmd = self._pad([10, 0, opt[param.lower()], value & 255])
+        return self._echo(cmd, self._cmd(cmd))
 
-    def source(self, text=False):
-        """Returns current input source.
+    def _brightness_get(self):
+        """Colour brightness, 1-255 (integer)."""
+        return self._colour_get('brightness')
 
-        :param text: Return text value?
+    def _brightness_set(self, value):
+        """Set colour brightness.
 
-        Returns int (2 or 3) or text representation if text is True.
+        :param value: brightness to set - int 1-255.
         """
-        cmd = self.pad([1, 1])
-        inputs = self.opts('source')
-        cur = self.cmd(cmd)[0] & 255
-        if text:
-            return inputs[cur]
-        return cur
+        if not self._valid_int(value):
+            return
+        return self._colour_set('brightness', value)
 
-    def source_set(self, source):
+    brightness = property(_brightness_get, _brightness_set)
+
+    def _contrast_get(self):
+        """Colour contrast, 1-255 (integer)."""
+        return self._colour_get('contrast')
+
+    def _contrast_set(self, value):
+        """Set colour contrast.
+
+        :param value: contrast to set - int 1-255.
+        """
+        if not self._valid_int(value):
+            return
+        return self._colour_set('contrast', value)
+
+    contrast = property(_contrast_get, _contrast_set)
+
+    def _hue_get(self):
+        """Colour hue, 1-255 (integer)."""
+        return self._colour_get('hue')
+
+    def _hue_set(self, value):
+        """Set colour hue.
+
+        :param value: hue to set - int 1-255.
+        """
+        if not self._valid_int(value):
+            return
+        return self._colour_set('hue', value)
+
+    hue = property(_hue_get, _hue_set)
+
+    def _saturation_get(self):
+        """Colour saturation, 1-255 (integer)."""
+        return self._colour_get('saturation')
+
+    def _saturation_set(self, value):
+        """Set colour saturation.
+
+        :param value: saturation to set - int 1-255.
+        """
+        if not self._valid_int(value):
+            return
+        return self._colour_set('saturation', value)
+
+    saturation = property(_saturation_get, _saturation_set)
+
+    def _source_get(self):
+        """Input source (integer/string).
+
+        Return an integer, getting the value:
+            0 = hdmi
+            1 = ypbpr
+
+        Return a bool, setting the value (case insensitive):
+            0, "hdmi" or anything else will set input to hdmi.
+            1 or "ypbpr" will set input to analogue.
+        """
+        cmd = self._pad([1, 1])
+        ret = self._cmd(cmd)[0] & 255
+        if ret is 3:
+            return 0
+        elif ret is 2:
+            return 1
+        raise ValueError(_('valid source number returned'))
+
+    def _source_set(self, source=None):
         """Set source.
 
-        :param source: See opts('source').
+        :param source: set to ypbpr or 1 to switch to analogue input,
+        will default to hdmi otherwise.
         """
-        cmd = self.pad([1, 0, source & 255])
-        return bool(self.cmd(cmd)[0] & 255)
+        if isinstance(source, str):
+            source = source.lower()
+        if source in [_('ypbpr'), 1]:
+            source = 2
+        else:
+            source = 3
+        cmd = self._pad([1, 0, source & 255])
+        return bool(self._cmd(cmd)[0] & 255)
 
-    def resolution(self, text=False):
-        """Returns the currently-reported input resolution.
+    source = property(_source_get, _source_set)
 
-        :param text: Return text value?
+    def _source_str(self):
+        """Source input, hdmi or ypbpr (string)."""
+        ret = self._source_get()
+        if ret is 0:
+            return _('hdmi')
+        elif ret is 1:
+            return _('ypbpr')
 
-        Returns int or text representation if text is True.
+    source_str = property(_source_str)
+
+    def _resolution_get(self):
+        """Currently-reported input resolution (integer).
+
+        See properties['resolution'] or use resolution_str.
         """
-        modes = self.opts('resolution')
-        cmd = self.pad([4, 1])
-        result = self.cmd(cmd)[0] & 255
-        resolution = modes[result]
+        cmd = self._pad([4, 1])
+        return self._cmd(cmd)[0] & 255
 
-        if text:
-            return resolution
-        return result
+    resolution = property(_resolution_get)
 
-    def size(self):
-        """Return current (output) picture size as a width, height
-        tuple.
+    def _resolution_str_get(self):
+        """Currently-reported resolution (string).
+
+        See properties['resolution'].
         """
-        cmd = self.pad([3, 1])
-        result = self.cmd(cmd)
+        modes = self._properties_get()['resolution']
+        res = self._resolution_get()
+        if res not in modes:
+            return _('unknown')
+        return str(modes[res])
+
+    resolution_str = property(_resolution_str_get)
+
+    def _picture_size_get(self):
+        """Current (output) picture size - width, height (tuple).
+
+        Set using tuple, e.g, "size = 1920, 1080"
+        """
+        cmd = self._pad([3, 1])
+        result = self._cmd(cmd)
         height = (
             result[0] & 255 +
             (result[1] & 255) << 8 +
@@ -413,13 +680,15 @@ class Controller(object):
             (result[6] & 255) << 16 +
             (result[7] & 255) << 24
         )
+        if width not in range(0, 1921) or height not in range(0, 1081):
+            raise ValueError(_('invalid width and/or height returned'))
         return width, height
 
-    def size_set(self, width, height):
-        """Set picture size.
+    def _picture_size_set(self, width, height):
+        """Set (output) picture size.
 
-        :param height: Picture height.
-        :param width: Picture width.
+        :param width: picture width.
+        :param height: picture height.
         """
         height = [
             height & 255,
@@ -433,22 +702,49 @@ class Controller(object):
             (width >> 16) & 255,
             (width >> 24) & 255,
         ]
-        cmd = self.pad([3, 0] + width + height)
-        return self.echo(cmd, self.cmd(cmd))
+        cmd = self._pad([3, 0] + width + height)
+        return self._echo(cmd, self._cmd(cmd))
 
-    def bitrate(self):
-        """Return current streaming bitrate (int)."""
-        cmd = self.pad([2, 1])
-        result = self.cmd(cmd)
+    def _size_set(self, value=None):
+        """Sets picture size.
+
+        :param value: tuple, e.g, "size = 1920, 1080".
+        """
+        try:
+            wid = value[0]
+            hei = value[1]
+            if wid not in range(1, 1921) or hei not in range(1, 1081):
+                raise ValueError
+        except (TypeError, KeyError):
+            raise ValueError(_('invalid width and/or height, or not a '
+                               'tuple, e.g, "size = 1920, 1080".'))
+        x = self._picture_size_set(wid, hei)
+        print(x)
+        return x
+
+    size = property(_picture_size_get, _size_set)
+
+    def _picture_size_str_get(self):
+        """Current (output) picture size (string).
+        "width x height" (no spaces), e.g, 720x576.
+        """
+        return "{}x{}".format(*self._picture_size_get())
+
+    size_str = property(_picture_size_str_get)
+
+    def _bitrate_get(self):
+        """Average (stream) bitrate, 500-8000 (integer)."""
+        cmd = self._pad([2, 1])
+        result = self._cmd(cmd)
         # This is split like this to make it less ugly (still is).
         onezero = (result[1] & 255) << 8 | (result[0] & 255)
         twothree = (result[2] & 255) << 16 | (result[3] & 255) << 24
         return onezero | twothree
 
-    def bitrate_set(self, average):
+    def _bitrate_set(self, average):
         """Set the bitrate.
 
-        :param average: The average bitrate to use.
+        :param average: the average bitrate to use.
         """
         average = int(average)
         average = average if average >= 500 else 500
@@ -473,5 +769,24 @@ class Controller(object):
             (high >> 16) & 255,
             (high >> 24) & 255,
         ]
-        cmd = self.pad([2, 0] + average + low + high)
-        return self.echo(cmd, self.cmd(cmd))
+        cmd = self._pad([2, 0] + average + low + high)
+        return self._echo(cmd, self._cmd(cmd))
+
+    bitrate = property(_bitrate_get, _bitrate_set)
+
+    def _toggle_get(self):
+        """Streaming toggle (bool).
+
+           Set to anything to toggle, check toggle again afterwards.
+
+           Return true (streaming or false (not streaming).
+        """
+        cmd = self._pad([15, 1])
+        return bool(self._cmd(cmd)[0] & 255)
+
+    def _toggle_set(self, value=None):
+        """Toggle start/stop streaming. """
+        cmd = self._pad([15, 0])
+        return self._echo(cmd, self._cmd(cmd))
+
+    toggle = property(_toggle_get, _toggle_set)

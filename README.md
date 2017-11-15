@@ -1,5 +1,7 @@
 # HS602
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/b1ee4a339ae24f919f12cee209f3bec0)](https://www.codacy.com/app/hello_58/HS602?utm_source=github.com&utm_medium=referral&utm_content=mpmc/HS602&utm_campaign=badger)
+
 Information and Python module (and soon a GUI) to control the HS602 capture device, manufactured by "maxmediatek" and sold under many different names/brands.
 
 * [Maplin Game Capture HD](http://www.maplin.co.uk/p/maplin-game-capture-hd-a84qu)  ("discontinued").

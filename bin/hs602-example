@@ -48,6 +48,12 @@ print('Input source: {}'.format(device.source_str))
 # Get input resolution.
 print('Input resolution: {}'.format(device.resolution_str))
 
+# Get frames-per-second
+print('FPS: {}'.format(device.fps))
+
+# Set frames-per-second -  Uncomment (remove "# " to execute).
+# device.fps = 60
+
 # Set picture settings - Uncomment (remove "# " to execute).
 # 0 - 255, default 128.
 # device.size = 1920, 1080

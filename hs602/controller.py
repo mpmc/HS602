@@ -24,6 +24,7 @@
 import socket
 import gettext
 
+
 gettext.install('Hs602controller')
 
 
@@ -56,7 +57,7 @@ class Controller(object):
         # Allow kwargs override.
         for key, value in kwargs.items():
             if hasattr(self, "_{}".format(key)):
-                func = getattr(self, "{}_set".format(key))
+                func = getattr(self, "_{}_set".format(key))
                 func(value)
 
     @staticmethod
@@ -790,3 +791,29 @@ class Controller(object):
         return self._echo(cmd, self._cmd(cmd))
 
     toggle = property(_toggle_get, _toggle_set)
+
+    def _fps_get(self):
+        """Stream Frames per second - 1-60 (int)."""
+        ret = self._cmd(self._pad([19, 1]))[0] & 255
+        return ret
+
+    def _fps_set(self, value=None):
+        """Stream frames-per-second.
+
+        :param value: frames-per-second to set - 1-60.
+        """
+        value = int(value)
+        if value not in range(1, 61):
+            value = 60
+        fps = [
+            value & 255,
+            (value >> 8) & 255,
+            (value >> 16) & 255,
+            (value >> 24) & 255,
+        ]
+        cmd = self._pad([19, 0] + fps)
+        ret = self._cmd(cmd)[2]
+        if ret == value:
+            return True
+
+    fps = property(_fps_get, _fps_set)

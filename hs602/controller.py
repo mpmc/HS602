@@ -778,27 +778,27 @@ class Controller(object):
     def _toggle_get(self):
         """Streaming toggle (bool).
 
-           Set to anything to toggle, check toggle again afterwards.
+        Set to anything to toggle, check toggle again afterwards.
 
-           Return true (streaming or false (not streaming).
+        Return true (streaming) or false (not streaming).
         """
         cmd = self._pad([15, 1])
         return bool(self._cmd(cmd)[0] & 255)
 
     def _toggle_set(self, value=None):
-        """Toggle start/stop streaming. """
+        """Toggle start/stop streaming."""
         cmd = self._pad([15, 0])
         return self._echo(cmd, self._cmd(cmd))
 
     toggle = property(_toggle_get, _toggle_set)
 
     def _fps_get(self):
-        """Stream Frames per second - 1-60 (int)."""
+        """Frames-per-second - 1-60 (int)."""
         ret = self._cmd(self._pad([19, 1]))[0] & 255
         return ret
 
     def _fps_set(self, value=None):
-        """Stream frames-per-second.
+        """Frames-per-second.
 
         :param value: frames-per-second to set - 1-60.
         """
@@ -817,3 +817,59 @@ class Controller(object):
             return True
 
     fps = property(_fps_get, _fps_set)
+
+    def _set_led(self, value=None):
+        """Flash LED.
+
+        You can't set this, just call it, e.g, foo.led.
+        """
+        cmd = self._pad([55, 0, 0 & 255])
+        return self._echo(cmd, self._cmd(cmd))
+
+    led = property(_set_led, _set_led)
+
+    def _set_keepalive(self, value=None):
+        """Send an (empty) keep-alive message to the device..
+
+        You can't set this, just call it, e.g, foo.keepalive, Calling
+        led works just as well :).
+        """
+        cmd = self._pad([0])
+        return self._echo(cmd, self._cmd(cmd))
+
+    keepalive = property(_set_keepalive, _set_keepalive)
+
+    def _get_hdcp(self):
+        """HDMI copy protection status."""
+        cmd = self._pad([5, 1])
+        ret = self._cmd(cmd)[0] & 255
+        return bool(ret)
+
+    hdcp = property(_get_hdcp)
+
+    def _set_multicast(self, value=None):
+        """Multicast (network wide broadcast on port 8085).
+
+        You can't set this, just call it, e.g, foo.multicast.
+        """
+        cmd = self._pad([8, 0, 1])
+        return self._echo(cmd, self._cmd(cmd))
+
+    multicast = property(_set_multicast, _set_multicast)
+
+    def _get_unicast(self):
+        """Unicast (network wide broadcast on port 8085) (object).
+
+        Set to anything to trigger, check again afterwards.
+        """
+        cmd = self._pad([8, 1])
+        return self._echo(cmd, self._cmd(cmd))
+
+    def _set_unicast(self, value=None):
+        """Unicast.
+        Return true or false.
+        """
+        cmd = self._pad([8, 0, 0])
+        return self._echo(cmd, self._cmd(cmd))
+
+    unicast = property(_get_unicast, _set_unicast)

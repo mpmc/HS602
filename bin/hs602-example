@@ -31,11 +31,14 @@ print(''.ljust(80, '-'))
 
 # Create a new object..
 #
-# You can pass a number of options as keywords here.
+# You can pass a number of options as keywords here..
 # There is usually no need to set an addr (unless you have more than
 # one device or none are discovered automatically).
 #
 device = Controller()
+
+# Flash the LED while get/set-ting device information.
+device.led
 
 # Set input source - Uncomment (remove "# " to execute).
 # use 1 to set analogue / anything else to set hdmi
@@ -48,7 +51,10 @@ print('Input source: {}'.format(device.source_str))
 # Get input resolution.
 print('Input resolution: {}'.format(device.resolution_str))
 
-# Get frames-per-second
+# Get HDCP value.
+print('Input HDCP: {}'.format(device.hdcp))
+
+# Get frames-per-second.
 print('FPS: {}'.format(device.fps))
 
 # Set frames-per-second -  Uncomment (remove "# " to execute).

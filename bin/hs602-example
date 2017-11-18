@@ -21,7 +21,7 @@
 #  MA 02110-1301, USA.
 #
 #
-from hs602.controller import Controller
+from hs602 import Controller
 
 input('This is an example script to control the HS602 capture '
       'device..\nPress enter to continue, or ctrl+c to exit.')

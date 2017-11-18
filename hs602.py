@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#  controller.py
+#  hs602.py
 #
 #  Copyright 2017 Mark Clarkstone <git@markclarkstone.co.uk>
 #

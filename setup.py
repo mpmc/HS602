@@ -47,9 +47,6 @@
 from setuptools import setup
 setup(
     name='hs602',
-    packages=[
-        'hs602',
-    ],
     scripts=[
         'bin/hs602-example',
     ],

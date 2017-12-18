@@ -24,12 +24,11 @@
 import socket
 import gettext
 
-
 gettext.install('Hs602controller')
 
 
 class Controller(object):
-    """HS602 Controller"""
+    """HS602 Controller."""
     def __init__(self, **kwargs):
         """To override the defaults, pass the following as keyword args:
 
@@ -59,6 +58,22 @@ class Controller(object):
             if hasattr(self, "_{}".format(key)):
                 func = getattr(self, "_{}_set".format(key))
                 func(value)
+
+    def _socket_get(self):
+        """Return the socket handle."""
+        return self.__socket
+
+    def _close(self, value=None):
+        """Kill the connection."""
+        try:
+            # If this fails we can ignore it.
+            self.__socket.shutdown(socket.SHUT_RDWR)
+            self.__socket.close()
+        except (OSError, AttributeError):
+            pass
+        self.__socket = None
+
+    socket = property(_socket_get, _close)
 
     @staticmethod
     def _properties_get():
@@ -387,16 +402,6 @@ class Controller(object):
                 break
         return data
 
-    def _close(self):
-        """Kill the connection."""
-        try:
-            # If this fails we can ignore it.
-            self.__socket.shutdown(socket.SHUT_RDWR)
-            self.__socket.close()
-        except (OSError, AttributeError):
-            pass
-        self.__socket = None
-
     def _devices_get(self):
         """Discovered devices (list).
 
@@ -404,6 +409,8 @@ class Controller(object):
         This will send a ping to self.addr:self.udp) & wait for
         replies, it will block until timeout is reached.
         """
+        # Reset to defaults.
+        self.__init__()
         res = self._udp_msg(self._ping_get())
         if res:
             return [rep[0] for rep in res if rep[2] == self._pong_get()]
@@ -818,7 +825,7 @@ class Controller(object):
 
     fps = property(_fps_get, _fps_set)
 
-    def _set_led(self, value=None):
+    def _led_set(self, value=None):
         """Flash LED.
 
         You can't set this, just call it, e.g, foo.led.
@@ -826,9 +833,9 @@ class Controller(object):
         cmd = self._pad([55, 0, 0 & 255])
         return self._echo(cmd, self._cmd(cmd))
 
-    led = property(_set_led, _set_led)
+    led = property(_led_set, _led_set)
 
-    def _set_keepalive(self, value=None):
+    def _keepalive_set(self, value=None):
         """Send an (empty) keep-alive message to the device..
 
         You can't set this, just call it, e.g, foo.keepalive, Calling
@@ -837,17 +844,17 @@ class Controller(object):
         cmd = self._pad([0])
         return self._echo(cmd, self._cmd(cmd))
 
-    keepalive = property(_set_keepalive, _set_keepalive)
+    keepalive = property(_keepalive_set, _keepalive_set)
 
-    def _get_hdcp(self):
+    def _hdcp_get(self):
         """HDMI copy protection status."""
         cmd = self._pad([5, 1])
         ret = self._cmd(cmd)[0] & 255
         return bool(ret)
 
-    hdcp = property(_get_hdcp)
+    hdcp = property(_hdcp_get)
 
-    def _set_multicast(self, value=None):
+    def _multicast_set(self, value=None):
         """Multicast (network wide broadcast on port 8085).
 
         You can't set this, just call it, e.g, foo.multicast.
@@ -855,9 +862,9 @@ class Controller(object):
         cmd = self._pad([8, 0, 1])
         return self._echo(cmd, self._cmd(cmd))
 
-    multicast = property(_set_multicast, _set_multicast)
+    multicast = property(_multicast_set, _multicast_set)
 
-    def _get_unicast(self):
+    def _unicast_get(self):
         """Unicast (network wide broadcast on port 8085) (object).
 
         Set to anything to trigger, check again afterwards.
@@ -865,11 +872,11 @@ class Controller(object):
         cmd = self._pad([8, 1])
         return self._echo(cmd, self._cmd(cmd))
 
-    def _set_unicast(self, value=None):
+    def _unicast_set(self, value=None):
         """Unicast.
         Return true or false.
         """
         cmd = self._pad([8, 0, 0])
         return self._echo(cmd, self._cmd(cmd))
 
-    unicast = property(_get_unicast, _set_unicast)
+    unicast = property(_unicast_get, _unicast_set)

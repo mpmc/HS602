@@ -103,4 +103,4 @@ print('Streaming: {}'.format(device.toggle))
 
 # Done
 print(''.ljust(80, '-'))
-input('Finished, press any key to exit!')
+input('Finished, press any key to exit.')

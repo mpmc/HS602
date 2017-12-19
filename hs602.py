@@ -880,3 +880,41 @@ class Controller(object):
         return self._echo(cmd, self._cmd(cmd))
 
     unicast = property(_unicast_get, _unicast_set)
+
+    def _settings_get(self):
+        """Return all device settings (dictionary).
+
+        Pass a dictionary to save settings.
+        """
+        return {
+            _('url'): self.url,
+            _('key'): self.key,
+            _('username'): self.username,
+            _('password'): self.password,
+            _('brightness'): self.brightness,
+            _('contrast'): self.contrast,
+            _('hue'): self.hue,
+            _('saturation'): self.saturation,
+            _('source'): self.source,
+            _('source_str'): self.source_str,
+            _('resolution'): self.resolution,
+            _('resolution_str'): self.resolution_str,
+            _('picture_size'): self.size,
+            _('picture_size_str'): self.size_str,
+            _('bitrate'): self.bitrate,
+            _('toggle'): self.toggle,
+            _('fps'): self.fps,
+            _('hdcp'): self.hdcp,
+            _('unicast'): self.unicast,
+        }
+
+    def _settings_set(self, settings):
+        """Save passed settings.
+
+           :param settings: A dictonary containing key, value pairs.
+        """
+        for name, value in settings.items():
+            if hasattr(self, name):
+                setattr(self, name, value)
+
+    settings = property(_settings_get, _settings_set)

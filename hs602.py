@@ -3,7 +3,7 @@
 #
 #  hs602.py
 #
-#  Copyright 2017 Mark Clarkstone <git@markclarkstone.co.uk>
+#  Copyright 2018 Mark Clarkstone <git@markclarkstone.co.uk>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -911,7 +911,7 @@ class Controller(object):
     def _settings_set(self, settings):
         """Save passed settings.
 
-           :param settings: A dictonary containing key, value pairs.
+           :param settings: A dictionary containing key, value pairs.
         """
         for name, value in settings.items():
             if hasattr(self, name):

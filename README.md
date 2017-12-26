@@ -33,7 +33,7 @@ pip3 install --user git+git://github.com/mpmc/HS602.git@master
 
 ## Usage
 
-See ```bin/example.py``` for example usage, or run it to test your device.
+See ```bin/hs602-example``` for example usage, or run it to test your device.
 
 
 ## Improvements?

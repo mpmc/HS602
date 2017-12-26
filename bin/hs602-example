@@ -3,7 +3,7 @@
 #
 #  hs602-example
 #
-#  Copyright 2017 Mark Clarkstone <git@markclarkstone.co.uk>
+#  Copyright 2018 Mark Clarkstone <git@markclarkstone.co.uk>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #  MA 02110-1301, USA.
 #
 #
+from time import sleep
 from hs602 import Controller
 
 input('This is an example script to control the HS602 capture '
@@ -100,6 +101,18 @@ print('Stream (output) bitrate: {}kbps'.format(device.bitrate))
 
 # Get stream state.
 print('Streaming: {}'.format(device.toggle))
+
+q = input('Start unicast network stream? (type yes to enable).')
+if q.lower() in ['yes', 'y']:
+    print('Setting unicast - stream will be available network wide on '
+          'port 8085 (use udp://@:8085) to view. Kill this script '
+          '(ctrl+c) to stop.')
+    # Loop..
+    device.unicast = True
+    while device.socket:
+        device.keepalive
+        sleep(8)
+
 
 # Done
 print(''.ljust(80, '-'))

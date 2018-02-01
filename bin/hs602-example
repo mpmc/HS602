@@ -38,6 +38,12 @@ print(''.ljust(80, '-'))
 #
 device = Controller()
 
+# Device firmware version.
+print("Device firmware version: {}".format(device.firmware_version_str))
+
+# Device address.
+print('Device address: {}'.format(device.addr))
+
 # Flash the LED while get/set-ting device information.
 device.led
 
@@ -77,10 +83,10 @@ print('Picture hue: {}'.format(device.hue))
 print('Picture saturation: {}'.format(device.hue))
 
 # Set rtmp - Max 255 in length, uncomment (remove "# " to execute).
-# device.username = 'foo'
-# device.password = 'bar'
-# device.url = 'rtmp://foo.com/upload/push'
-# device.key = 'secret'
+# device.username = 'demo'
+# device.password = 'demo'
+# device.url = 'rtmp://stream.demo.com/demo'
+# device.key = 'demo'
 
 # Get rtmp details.
 print('RTMP username: {}'.format(device.username))
@@ -90,7 +96,7 @@ print('RTMP key: {}'.format(device.key))
 
 # Set stream average bitrate - 500 - 8000
 # Uncomment (remove "# " to execute).
-# device.bitrate = 8000
+# device.bitrate = 500
 
 # Get streaming bitrate.
 print('Stream (output) bitrate: {}kbps'.format(device.bitrate))

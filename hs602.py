@@ -24,11 +24,11 @@
 import socket
 import gettext
 
-gettext.install('Hs602controller')
+gettext.install('Hs602')
 
 
 class Controller(object):
-    """HS602 Controller."""
+    """HS602 controller."""
     def __init__(self, **kwargs):
         """To override the defaults, pass the following as keyword args:
 
@@ -880,6 +880,26 @@ class Controller(object):
         return self._echo(cmd, self._cmd(cmd))
 
     unicast = property(_unicast_get, _unicast_set)
+
+    def _version_get(self):
+        """Return the device version as tuple."""
+        cmd = self._pad([56, 1])
+        ret = self._cmd(cmd)
+        major, minor, revision = [
+            ret[0] & 255,
+            ret[1] & 255,
+            ret[2] & 255
+        ]
+        return major, minor, revision
+
+    firmware_version = property(_version_get)
+
+    def _version_str_get(self):
+        """Return version as string"""
+        major, minor, revision = self.firmware_version
+        return "{}.{}.{}".format(major, minor, revision)
+
+    firmware_version_str = property(_version_str_get)
 
     def _settings_get(self):
         """Return all device settings (dictionary).

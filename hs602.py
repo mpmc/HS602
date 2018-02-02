@@ -901,6 +901,14 @@ class Controller(object):
 
     firmware_version_str = property(_version_str_get)
 
+    def _clients_get(self):
+        """Return client id number & total connected clients."""
+        cmd = self._pad([50, 1])
+        current, total = cmd[0] & 255, cmd[1] & 255
+        return current, total
+
+    clients = property(_clients_get)
+
     def _settings_get(self):
         """Return all device settings (dictionary).
 

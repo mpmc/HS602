@@ -44,6 +44,9 @@ print("Device firmware version: {}".format(device.firmware_version_str))
 # Device address.
 print('Device address: {}'.format(device.addr))
 
+# Connected clients.
+print('Current client ID / Total clients: {}'.format(device.clients))
+
 # Flash the LED while get/set-ting device information.
 device.led
 

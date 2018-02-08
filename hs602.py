@@ -934,6 +934,9 @@ class Controller(object):
             _('fps'): self.fps,
             _('hdcp'): self.hdcp,
             _('unicast'): self.unicast,
+            _('clients'): self.clients,
+            _('firmware'): self.firmware_version,
+            _('firmware_str'): self.firmware_version_str,
         }
 
     def _settings_set(self, settings):

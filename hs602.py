@@ -22,7 +22,10 @@
 #
 #
 import socket
+import queue
+import threading
 import gettext
+import traceback
 
 gettext.install('Hs602')
 
@@ -151,7 +154,7 @@ class Controller(object):
     @staticmethod
     def _valid_str(value):
         """Return true if string value is 1-255 in length."""
-        value = str(value)
+        value = '{}'.format(value)
         if len(value) in range(1, 256):
             return True
         raise ValueError(_('invalid value, requires a string of 1-255 '
@@ -189,14 +192,14 @@ class Controller(object):
 
         Setting a value will kill existing sockets.
         """
-        return str(self._addr)
+        return '{}'.format(self._addr)
 
     def _addr_set(self, value):
         """Set device address - will kill existing sockets.
 
         :param value: device (or broadcast) address to set.
         """
-        self._addr = str(value)
+        self._addr = '{}'.format(value)
         # Close any existing sockets if addr is set.
         self._close()
 
@@ -272,40 +275,40 @@ class Controller(object):
 
     def _encoding_get(self):
         """Message encoding (string)."""
-        return str(self._encoding)
+        return '{}'.format(self._encoding)
 
     def _encoding_set(self, value):
         """Set message encoding.
 
         :param value: encoding value.
         """
-        self._encoding = str(value)
+        self._encoding = '{}'.format(value)
 
     encoding = property(_encoding_get, _encoding_set)
 
     def _ping_get(self):
         """Ping trigger message (string)."""
-        return str(self._ping).encode(self.encoding)
+        return '{}'.format(self._ping).encode(self.encoding)
 
     def _ping_set(self, value):
         """Set ping trigger message.
 
         :param value: ping value.
         """
-        self._ping = str(value)
+        self._ping = '{}'.format(value)
 
     ping = property(_ping_get, _ping_set)
 
     def _pong_get(self):
         """Expected pong reply (string)."""
-        return str(self._pong).encode(self.encoding)
+        return '{}'.format(self._pong).encode(self.encoding)
 
     def _pong_set(self, value):
         """Set pong reply.
 
         :param value: expected pong reply.
         """
-        self._pong = str(value)
+        self._pong = '{}'.format(value)
 
     pong = property(_pong_get, _pong_set)
 
@@ -937,6 +940,7 @@ class Controller(object):
             _('clients'): self.clients,
             _('firmware'): self.firmware_version,
             _('firmware_str'): self.firmware_version_str,
+            _('address'): self.addr,
         }
 
     def _settings_set(self, settings):
@@ -949,3 +953,52 @@ class Controller(object):
                 setattr(self, name, value)
 
     settings = property(_settings_get, _settings_set)
+
+
+class Callback(Controller):
+    """Controller callback."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._queued = queue.Queue()
+        self.cb = self.callback = self.register = self.queue
+        # Initialise threading.
+        thread = threading.Thread(target=self._process)
+        thread.daemon = True
+        thread.start()
+
+    def queue(self, prop, value=None, callback=None):
+        """Queue a property set/get callback (threaded).
+
+        :param prop: property to retrieve/set.
+        :param value: optional set value - leave as none to get a value.
+        :param callback: optional callback method.
+
+        The callback method must accept a single value, note exceptions
+        are also returned - so be sure to check for those.
+        """
+        self._queued.put((prop, value, callback))
+
+    def _process(self):
+        """Method to process the queue - this should be threaded."""
+        def task(name, value, callback):
+            ret = None
+            name = '{}'.format(name)
+            try:
+                if value:
+                    ret = setattr(self, name, value)
+                else:
+                    ret = getattr(self, name)
+            except Exception as exc:
+                # Print the error and return it.
+                traceback.print_exc()
+                ret = exc
+            # Now launch the callback.
+            # We don't handle callback Exceptions.
+            if callable(callback):
+                callback(ret)
+
+        # Process the queue - We don't need to worry about sleeping
+        # here as the queue blocks by default.
+        while True:
+            prop, value, callback = self._queued.get()
+            task(prop, value, callback)

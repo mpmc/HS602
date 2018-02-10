@@ -10,7 +10,7 @@ Information and Python module (and soon a GUI) to control the HS602 capture devi
 
 ## Features
 
-* **Multi-platform** - works anywhere there's Python3!
+* **Multi-platform** - works anywhere there's Python3 (with threading)!
 * Almost all the features of the Windows Shareview application. 
 * Device discovery.
 * Streaming toggling (start, stop streaming).
@@ -18,7 +18,7 @@ Information and Python module (and soon a GUI) to control the HS602 capture devi
 * Can be used to control a HS602 encoder over the Internet. Although I wouldn't recommend it, it's too insecure! 
 * Simple and easy to understand/use, uses getters/setters.
 * Versions 0.1.1>= are PEP8 compliant.
-* Minimal requirements, uses just socket and gettext (for optional translation).
+* Minimal requirements, uses just threading, queue, socket and gettext (for optional translation).
 
 ## Install
 
@@ -63,4 +63,3 @@ Use your favourite software to connect at 115200 baud/speed with parity set to E
 
 ## Links
 [XDA developers' forum thread](https://forum.xda-developers.com/hardware-hacking/hardware/easily-moddable-hdmi-capture-box-t2988451)
-

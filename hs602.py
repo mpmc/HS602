@@ -25,7 +25,6 @@ import socket
 import queue
 import threading
 import gettext
-import traceback
 
 gettext.install('Hs602')
 
@@ -163,7 +162,7 @@ class Controller(object):
     @staticmethod
     def _valid_int(value):
         """Return true if int value is 1-255."""
-        value = int(value)
+        value = round(int(value))
         if value in range(1, 256):
             return True
         raise ValueError(_('invalid value, requires a number between '
@@ -172,7 +171,7 @@ class Controller(object):
     @staticmethod
     def _valid_port(value):
         """Return true if port int value is 1-65535."""
-        value = int(value)
+        value = round(int(value))
         if value in range(1, 65536):
             return True
         raise ValueError(_('invalid value, requires a port number '
@@ -943,14 +942,13 @@ class Controller(object):
             _('address'): self.addr,
         }
 
-    def _settings_set(self, settings):
+    def _settings_set(self, properties):
         """Save passed settings.
 
-           :param settings: A dictionary containing key, value pairs.
+           :param properties: A dictionary containing key, value pairs.
         """
-        for name, value in settings.items():
-            if hasattr(self, name):
-                setattr(self, name, value)
+        for name, value in properties.items():
+            setattr(self, '{}'.format(name), value)
 
     settings = property(_settings_get, _settings_set)
 
@@ -969,29 +967,55 @@ class Callback(Controller):
     def queue(self, prop, value=None, callback=None):
         """Queue a property set/get callback (threaded).
 
-        :param prop: property to retrieve/set.
+        :param prop: property or properties to get/set.
         :param value: optional set value - leave as none to get a value.
         :param callback: optional callback method.
 
         The callback method must accept a single value, note exceptions
         are also returned - so be sure to check for those.
+
+        If you set prop to a tuple, list or set, a dictionary of the
+        requested properties is returned, value in this case is ignored!
+
+        You can only set a single property, or to set multiple values
+        pass a dictionary to the 'settings' property.
+
+        for example,..
+
+        save = {'key': 'value', 'key2', 'value'}
+        obj.queue('settings', save)
         """
         self._queued.put((prop, value, callback))
 
     def _process(self):
         """Method to process the queue - this should be threaded."""
-        def task(name, value, callback):
-            ret = None
-            name = '{}'.format(name)
-            try:
-                if value:
-                    ret = setattr(self, name, value)
-                else:
-                    ret = getattr(self, name)
-            except Exception as exc:
-                # Print the error and return it.
-                traceback.print_exc()
-                ret = exc
+        def task(prop, value, callback):
+            # Another nested method to actually get/set the value.
+            def sub_task(prop, value=None):
+                ret = None
+                prop = '{}'.format(prop)
+                # Are we getting or setting a value?
+                try:
+                    if value:
+                        ret = setattr(self, prop, value)
+                    else:
+                        ret = getattr(self, prop)
+                except Exception as exc:
+                    ret = exc
+                return ret
+
+            # If prop is a set, list or tuple we're getting a selection
+            # of values.
+            ret = item = None
+            selection = {}
+            if isinstance(prop, (list, tuple, set)):
+                for item in prop:
+                    item = '{}'.format(item)
+                    selection[item] = sub_task(item)
+                ret = selection
+            else:
+                ret = sub_task(prop, value)
+
             # Now launch the callback.
             # We don't handle callback Exceptions.
             if callable(callback):

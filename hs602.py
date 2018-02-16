@@ -238,7 +238,7 @@ class Controller(object):
         """
         if not self._valid_port(value):
             return
-        self._udp = int(value)
+        self._tcp = int(value)
         # Close any existing sockets if tcp is set.
         self._close()
 
@@ -255,7 +255,7 @@ class Controller(object):
         """
         if not self._valid_int(value):
             return
-        self._udp = int(value)
+        self._timeout = int(value)
 
     timeout = property(_timeout_get, _timeout_set)
 

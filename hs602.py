@@ -198,6 +198,10 @@ class Controller(object):
 
         :param value: device (or broadcast) address to set.
         """
+        try:
+            value = socket.gethostbyname(value.strip())
+        except (OSError, AttributeError):
+            pass
         self._addr = '{}'.format(value)
         # Close any existing sockets if addr is set.
         self._close()

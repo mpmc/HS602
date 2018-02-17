@@ -71,7 +71,8 @@ class Controller(object):
             # If this fails we can ignore it.
             self.__socket.shutdown(socket.SHUT_RDWR)
             self.__socket.close()
-        except (OSError, AttributeError):
+        except (socket.error, socket.gaierror, socket.herror,
+                socket.timeout, OSError, AttributeError):
             pass
         self.__socket = None
 
@@ -193,15 +194,25 @@ class Controller(object):
         """
         return '{}'.format(self._addr)
 
+    def _addr_get_resolve(self):
+        """Resolve address."""
+        value = self._addr_get()
+        try:
+            value = value.strip()
+        except AttributeError:
+            pass
+        try:
+            value = socket.gethostbyname(value)
+        except (socket.error, socket.gaierror, socket.herror,
+                socket.timeout, OSError):
+            pass
+        return value
+
     def _addr_set(self, value):
         """Set device address - will kill existing sockets.
 
         :param value: device (or broadcast) address to set.
         """
-        try:
-            value = socket.gethostbyname(value.strip())
-        except (OSError, AttributeError):
-            pass
         self._addr = '{}'.format(value)
         # Close any existing sockets if addr is set.
         self._close()
@@ -347,7 +358,7 @@ class Controller(object):
             while True:
                 # Send message.
                 if msg:
-                    sent = s.sendto(msg, (self._addr_get(),
+                    sent = s.sendto(msg, (self._addr_get_resolve(),
                                           self._udp_get()))
                     if not sent > 0:
                         break
@@ -360,7 +371,8 @@ class Controller(object):
                 try:
                     data, [addr, port] = s.recvfrom(2048)
                     replies += [[addr, port, data]]
-                except socket.timeout:
+                except (socket.error, socket.gaierror,
+                        socket.herror, socket.timeout, OSError):
                     break
             return replies
 
@@ -386,7 +398,7 @@ class Controller(object):
         # This is just the the "C" char and the IPv4 address of the
         # box in reverse.
         if not self.__socket:
-            ip = reversed(self._addr_get().split('.'))
+            ip = reversed(self._addr_get_resolve().split('.'))
             cmd = [67] + [int(octal) for octal in ip]
             self._udp_msg(cmd, False)
             addr = (self._addr_get(), self._tcp_get())
@@ -994,7 +1006,7 @@ class Callback(Controller):
     def _process(self):
         """Method to process the queue - this should be threaded."""
         def task(prop, value, callback):
-            # Another nested method to actually get/set the value.
+            # Nested method to actually get/set the value.
             def sub_task(prop, value=None):
                 ret = None
                 prop = '{}'.format(prop)

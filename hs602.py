@@ -859,7 +859,7 @@ class Controller(object):
         You can't set this, just call it, e.g, foo.keepalive, Calling
         led works just as well :).
         """
-        cmd = self._pad([0])
+        cmd = self._pad([46])
         return self._echo(cmd, self._cmd(cmd))
 
     keepalive = property(_keepalive_set, _keepalive_set)

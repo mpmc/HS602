@@ -133,7 +133,7 @@ if q.lower() == 'u':
 
 while device.socket:
     device.keepalive = True
-    sleep(6)
+    sleep(2)
 
 # Done
 print(''.ljust(80, '-'))

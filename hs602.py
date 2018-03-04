@@ -980,12 +980,12 @@ class Callback(Controller):
         thread.daemon = True
         thread.start()
 
-    def queue(self, prop, value=None, callback=None):
+    def queue(self, callback, prop, value=None):
         """Queue a property set/get callback (threaded).
 
+        :param callback: Callback method - can be set to None.
         :param prop: property or properties to get/set.
         :param value: optional set value - leave as none to get a value.
-        :param callback: optional callback method.
 
         The callback method must accept a single value, note exceptions
         are also returned - so be sure to check for those.

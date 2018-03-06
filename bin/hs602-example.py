@@ -100,7 +100,7 @@ print('RTMP key: {}'.format(device.key))
 
 # Set stream average bitrate - 500 - 8000
 # Uncomment (remove "# " to execute).
-# device.bitrate = 8000
+# device.bitrate = 10000
 
 # Get streaming bitrate.
 print('Stream (output) bitrate: {}kbps'.format(device.bitrate))
@@ -109,31 +109,32 @@ print('Stream (output) bitrate: {}kbps'.format(device.bitrate))
 # "# " to execute).
 # device.toggle = True
 
-# Get stream state.
-print('Streaming: {}'.format(device.toggle))
-
 # Stop multi/uni-cast.
 device.multicast = False
 device.unicast = False
 
 q = input('Start UDP stream? (type u for unicast or m for multicast '
           '(unstable!)) -> ')
+
 if q.lower() == 'm':
     device.multicast = True
-    print('Stream is available network wide on udp://@:8085\n\n'
+    print('Stream is available network wide on udp(or rtp)://@:8085\n\n'
           'Warning, This is pretty much untested, and be aware that '
           'multicast is bandwidth heavy and may swamp your '
           'network. If this happens, use unicast instead.')
 
-if q.lower() == 'u':
+elif q.lower() == 'u':
     device.unicast = True
-    print('Stream is available locally on udp://@:8085). \nPress '
-          'ctrl + c or close this window to stop streaming..')
+    print('Stream is available locally on udp(or rtp)://@:8085).\n'
+          'Press ctrl + c or close this window to stop streaming..')
 
+else:
+    print('Invalid input, not streaming.')
 
 while device.socket:
-    device.keepalive = True
-    sleep(2)
+    print('Streaming: {}'.format(device.toggle))
+    print('Client number {}, Client Total: {}'.format(*device.clients))
+    sleep(6)
 
 # Done
 print(''.ljust(80, '-'))

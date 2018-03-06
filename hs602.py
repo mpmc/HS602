@@ -48,7 +48,8 @@ class Controller(object):
         self._addr = self.__addr_broadcast
         self._udp = 8086
         self._tcp = 8087
-        self._timeout = 10
+        self._timeout = 4
+        self._error = None
         self._ping = 'HS602'
         self._pong = 'YES'
         self._encoding = 'utf-8'
@@ -60,23 +61,6 @@ class Controller(object):
             if hasattr(self, "_{}".format(key)):
                 func = getattr(self, "_{}_set".format(key))
                 func(value)
-
-    def _socket_get(self):
-        """Return the socket handle."""
-        return self.__socket
-
-    def _close(self, value=None):
-        """Kill the connection."""
-        try:
-            # If this fails we can ignore it.
-            self.__socket.shutdown(socket.SHUT_RDWR)
-            self.__socket.close()
-        except (socket.error, socket.gaierror, socket.herror,
-                socket.timeout, OSError, AttributeError):
-            pass
-        self.__socket = None
-
-    socket = property(_socket_get, _close)
 
     @staticmethod
     def _properties_get():
@@ -186,6 +170,46 @@ class Controller(object):
         :param second: second object.
         """
         return first == second
+
+    def _socket_get(self):
+        """Return the socket handle."""
+        return self.__socket
+
+    def _close(self, value=None):
+        """Kill the connection."""
+        try:
+            # If this fails we can ignore it.
+            self.__socket.shutdown(socket.SHUT_RDWR)
+            self.__socket.close()
+        except (socket.error, socket.gaierror, socket.herror,
+                socket.timeout, OSError, AttributeError):
+            pass
+        self.__socket = None
+
+    socket = property(_socket_get, _close)
+
+    def _error_get(self):
+        """Return the number of times an error has occurred."""
+        try:
+            self._error = int(self._error)
+        except TypeError:
+            self._error = 0
+        return self._error
+
+    def _error_set(self, value=None):
+        """Increment the error counter.
+
+        :param value: Set to 0 to reset counter.
+        """
+        cur = self._error_get()
+        if value is 0:
+            self._error = None
+        else:
+            cur += 1
+            self._error = cur
+        return self._error_get()
+
+    error = property(_error_get, _error_set)
 
     def _addr_get(self):
         """Device address (string).
@@ -406,19 +430,28 @@ class Controller(object):
             self.__socket = socket.create_connection(*addr)
 
         # Send it & get replies (if needed).
-        self.__socket.sendall(msg)
-        if not reply:
-            return True
-        data = bytes()
-        while True:
-            buf = self.__socket.recv(self._cmd_len_get())
-            if not buf:
-                self._close()
-                break
-            data += buf
-            if len(data) == self._cmd_len_get():
-                break
-        return data
+        try:
+            self.__socket.sendall(msg)
+            self._error_set(0)
+            if not reply:
+                return True
+            data = bytes()
+            while True:
+                buf = self.__socket.recv(self._cmd_len_get())
+                if not buf:
+                    self._close()
+                    break
+                data += buf
+                if len(data) == self._cmd_len_get():
+                    break
+            return data
+        except (socket.error, socket.gaierror,
+                socket.herror, socket.timeout, OSError):
+            if self._error_get() >= 1:
+                raise
+            self._error_set(1)
+            self._close()
+            return self._cmd(msg, reply)
 
     def _devices_get(self):
         """Discovered devices (list).
@@ -774,7 +807,7 @@ class Controller(object):
         """
         average = int(average)
         average = average if average >= 500 else 500
-        average = average if average <= 8000 else 8000
+        average = average if average <= 15000 else 15000
         low = int(average * 7 / 10)
         high = int(average * 13 / 10)
         average = [
@@ -853,17 +886,6 @@ class Controller(object):
 
     led = property(_led_set, _led_set)
 
-    def _keepalive_set(self, value=None):
-        """Send an (empty) keep-alive message to the device..
-
-        You can't set this, just call it, e.g, foo.keepalive, Calling
-        led works just as well :).
-        """
-        cmd = self._pad([46])
-        return self._echo(cmd, self._cmd(cmd))
-
-    keepalive = property(_keepalive_set, _keepalive_set)
-
     def _hdcp_get(self):
         """HDMI copy protection status."""
         cmd = self._pad([5, 1])
@@ -921,7 +943,7 @@ class Controller(object):
 
     def _clients_get(self):
         """Return client id number & total connected clients."""
-        cmd = self._pad([50, 1])
+        cmd = self._cmd(self._pad([50, 1]))
         current, total = cmd[0] & 255, cmd[1] & 255
         return current, total
 

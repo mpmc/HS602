@@ -37,24 +37,30 @@ class Controller(object):
         :param addr: Address of device.
         :param udp: UDP broadcast port.
         :param tcp: TCP command port.
-        :param timeout: Socket timeout. Don't set this to 0 or None.
+        :param timeout: UDP Socket timeout. Don't set this to 0 or None.
         :param ping: Message to trigger pong reply.
         :param pong: Expected pong response.
         :param encoding: Message encoding.
         :param cmd_len: Command length. Don't set this to 0 or None.
+        :param cmd_limit: The maximum commands allowed before generating
+        a new socket.
         """
         # Defaults.
         self.__addr_broadcast = '<broadcast>'
         self._addr = self.__addr_broadcast
         self._udp = 8086
         self._tcp = 8087
-        self._timeout = 4
+        self._timeout = 10
         self._error = None
         self._ping = 'HS602'
         self._pong = 'YES'
         self._encoding = 'utf-8'
         self._cmd_len = 15
+        self._cmd_limit = 30
+        self.__cmd_count = None
         self.__socket = None
+        self.__old_socket = None
+        self.__err_count = None
 
         # Allow kwargs override.
         for key, value in kwargs.items():
@@ -146,18 +152,18 @@ class Controller(object):
 
     @staticmethod
     def _valid_int(value):
-        """Return true if int value is 1-255."""
+        """Return true if int value is 0-255."""
         value = round(int(value))
-        if value in range(1, 256):
+        if value in range(0, 256):
             return True
         raise ValueError(_('invalid value, requires a number between '
                            '1 and 255'))
 
     @staticmethod
     def _valid_port(value):
-        """Return true if port int value is 1-65535."""
+        """Return true if port int value is 0-65535."""
         value = round(int(value))
-        if value in range(1, 65536):
+        if value in range(0, 65536):
             return True
         raise ValueError(_('invalid value, requires a port number '
                            'between 1 and 65535'))
@@ -176,7 +182,7 @@ class Controller(object):
         return self.__socket
 
     def _close(self, value=None):
-        """Kill the connection."""
+        """Kill active tcp connection."""
         try:
             # If this fails we can ignore it.
             self.__socket.shutdown(socket.SHUT_RDWR)
@@ -184,32 +190,20 @@ class Controller(object):
         except (socket.error, socket.gaierror, socket.herror,
                 socket.timeout, OSError, AttributeError):
             pass
-        self.__socket = None
+        self.__socket = self.__err_count = self.__cmd_count = None
+
+    def __close_old_socket(self):
+        """Kill old tcp connection."""
+        try:
+            # If this fails we can ignore it.
+            self.__old_socket.shutdown(socket.SHUT_RDWR)
+            self.__old_socket.close()
+        except (socket.error, socket.gaierror, socket.herror,
+                socket.timeout, OSError, AttributeError):
+            pass
+        self.__old_socket = None
 
     socket = property(_socket_get, _close)
-
-    def _error_get(self):
-        """Return the number of times an error has occurred."""
-        try:
-            self._error = int(self._error)
-        except TypeError:
-            self._error = 0
-        return self._error
-
-    def _error_set(self, value=None):
-        """Increment the error counter.
-
-        :param value: Set to 0 to reset counter.
-        """
-        cur = self._error_get()
-        if value is 0:
-            self._error = None
-        else:
-            cur += 1
-            self._error = cur
-        return self._error_get()
-
-    error = property(_error_get, _error_set)
 
     def _addr_get(self):
         """Device address (string).
@@ -244,7 +238,7 @@ class Controller(object):
     addr = property(_addr_get, _addr_set)
 
     def _udp_get(self):
-        """UDP broadcast port, 1-65535 (integer).
+        """UDP broadcast port, 0-65535 (integer).
 
         Setting a value will kill existing sockets.
         """
@@ -253,7 +247,7 @@ class Controller(object):
     def _udp_set(self, value):
         """Set UDP broadcast port - will kill existing sockets.
 
-        :param value: UDP to broadcast on, uses default if not 1-65535.
+        :param value: UDP to broadcast on, uses default if not 0-65535.
         """
         if not self._valid_port(value):
             return
@@ -273,7 +267,7 @@ class Controller(object):
     def _tcp_set(self, value):
         """Set TCP command port - will kill existing sockets.
 
-        :param value: TCP command port, uses default if not 1-65535.
+        :param value: TCP command port, uses default if not 0-65535.
         """
         if not self._valid_port(value):
             return
@@ -284,13 +278,13 @@ class Controller(object):
     tcp = property(_tcp_get, _tcp_set)
 
     def _timeout_get(self):
-        """Socket timeout, 1-255 (integer)."""
+        """Socket timeout, 0-255 (integer)."""
         return int(self._timeout)
 
     def _timeout_set(self, value):
         """Set socket timeout.
 
-        :param value: timeout value 1-255.
+        :param value: timeout value 0-255.
         """
         if not self._valid_int(value):
             return
@@ -310,6 +304,21 @@ class Controller(object):
         self._cmd_len = int(value)
 
     cmd_len = property(_cmd_len_get, _cmd_len_set)
+
+    def _cmd_limit_get(self):
+        """Maximum allowed messages per socket, 0-255 (integer)."""
+        return int(self._cmd_limit)
+
+    def _cmd_limit_set(self, value):
+        """Set socket message limit.
+
+        :param value: timeout value 0-255.
+        """
+        if not self._valid_int(value):
+            return
+        self._cmd_limit = int(value)
+
+    cmd_limit = property(_cmd_limit_get, _cmd_limit_set)
 
     def _encoding_get(self):
         """Message encoding (string)."""
@@ -350,17 +359,15 @@ class Controller(object):
 
     pong = property(_pong_get, _pong_set)
 
-    def _pad(self, data, pad_len=None):
-        """Append data with zero bytes to the size of pad_len.
+    def _pad(self, data, pad=None):
+        """Return data with appended msg count
 
-        :param data: data to pad, can be anything that can be
-        converted to bytes.
+        :param data: data to pad, must be a list!
         :param pad_len: size required, if not set will use self.cmd_len.
         """
-        pad_len = pad_len or self.cmd_len
+        pad = pad or self.cmd_len
         data = bytes(data)
-        data = data.ljust(pad_len, b'\0')
-        return data
+        return data.ljust(pad, b'\0')
 
     def _udp_msg(self, msg, reply=True):
         """Send UDP message.
@@ -379,6 +386,7 @@ class Controller(object):
             s.bind(('', self._udp_get()))
 
             replies = list()
+            sent = 0
             while True:
                 # Send message.
                 if msg:
@@ -411,7 +419,36 @@ class Controller(object):
         :param msg: message (in bytes) to send.
         :param reply: do we want to wait for a reply?
         """
+        def err(zero=False):
+            """Nested error counter.
+
+            :param zero: set to (anything to) reset counter.
+            """
+            if zero:
+                self.__err_count = None
+            try:
+                self.__err_count += 1
+            except TypeError:
+                self.__err_count = 0
+            return self.__err_count
+
+        def cmd_count():
+            """Nested command counter."""
+            try:
+                int(self.__cmd_count)
+            except TypeError:
+                self.__cmd_count = 0
+            self.__cmd_count += 1
+            return self.__cmd_count
+
+        # Redo the connection/cmd if the command count hits the limit.
+        if cmd_count() >= self._cmd_limit_get():
+            self.__old_socket = self.__socket
+            self.__socket = self.__cmd_count = None
+            return self._cmd(msg, reply)
+
         msg = bytes(msg)
+        data_len = self._cmd_len_get()
         # Do we need to discover a device first?
         addr = self._addr_get()
         if not addr or addr.lower() == self.__addr_broadcast.lower():
@@ -426,32 +463,49 @@ class Controller(object):
             cmd = [67] + [int(octal) for octal in ip]
             self._udp_msg(cmd, False)
             addr = (self._addr_get(), self._tcp_get())
-            addr = addr, self._timeout_get()
-            self.__socket = socket.create_connection(*addr)
+            self.__socket = socket.socket(family=socket.AF_INET,
+                                          type=socket.SOCK_STREAM,
+                                          proto=socket.IPPROTO_TCP)
+            self.__socket.settimeout(30)
+            self.__socket.connect(addr)
 
-        # Send it & get replies (if needed).
+        # Send!!
         try:
-            self.__socket.sendall(msg)
-            self._error_set(0)
-            if not reply:
-                return True
+            self.__socket.sendall(msg, 0)
+            # Receive reply - Its length should be exactly data_len!
+            # We must always get the reply even if it's not wanted!
             data = bytes()
             while True:
-                buf = self.__socket.recv(self._cmd_len_get())
+                buf = self.__socket.recv(data_len)
                 if not buf:
                     self._close()
                     break
                 data += buf
-                if len(data) == self._cmd_len_get():
+                if len(data) >= data_len:
                     break
-            return data
-        except (socket.error, socket.gaierror,
-                socket.herror, socket.timeout, OSError):
-            if self._error_get() >= 1:
+        except (socket.error, socket.gaierror, socket.herror,
+                socket.timeout, OSError):
+            # Do we raise an error or try again?
+            if err() >= 2:
                 raise
-            self._error_set(1)
             self._close()
             return self._cmd(msg, reply)
+
+        # If the reply isn't received properly, send cmd again!
+        if not len(data) >= data_len:
+            err()
+            return self._cmd(msg, reply)
+
+        # Close the old socket (if any).
+        self.__close_old_socket()
+
+        # Reply or data wanted?
+        if not reply:
+            data = True
+
+        # Zero the error counter & return the result.
+        err(True)
+        return data
 
     def _devices_get(self):
         """Discovered devices (list).
@@ -778,7 +832,6 @@ class Controller(object):
             raise ValueError(_('invalid width and/or height, or not a '
                                'tuple, e.g, "size = 1920, 1080".'))
         x = self._picture_size_set(wid, hei)
-        print(x)
         return x
 
     size = property(_picture_size_get, _size_set)
@@ -792,7 +845,7 @@ class Controller(object):
     size_str = property(_picture_size_str_get)
 
     def _bitrate_get(self):
-        """Average (stream) bitrate, 500-8000 (integer)."""
+        """Average (stream) bitrate, 500-10000 (integer)."""
         cmd = self._pad([2, 1])
         result = self._cmd(cmd)
         # This is split like this to make it less ugly (still is).
@@ -851,7 +904,7 @@ class Controller(object):
     toggle = property(_toggle_get, _toggle_set)
 
     def _fps_get(self):
-        """Frames-per-second - 1-60 (int)."""
+        """Frames-per-second - 1-60 (integer)."""
         ret = self._cmd(self._pad([19, 1]))[0] & 255
         return ret
 
@@ -881,7 +934,7 @@ class Controller(object):
 
         You can't set this, just call it, e.g, foo.led.
         """
-        cmd = self._pad([55, 0, 0 & 255])
+        cmd = self._pad([55, 0, 1 & 255])
         return self._echo(cmd, self._cmd(cmd))
 
     led = property(_led_set, _led_set)
@@ -894,32 +947,25 @@ class Controller(object):
 
     hdcp = property(_hdcp_get)
 
-    def _multicast_set(self, value=None):
-        """Multicast (network wide broadcast on port 8085).
+    # You can't actually detect whether the device is in unicast
+    # or multicast mode (via commands). You can only tell it what you
+    # want, hope & pray.
+    #
+    # Also, newer versions of the firmware automatically enable unicast
+    # on connect whereas the older firmware won't, a mode must be
+    # sent for it to actually stream!
 
-        You can't set this, just call it, e.g, foo.multicast.
-        """
-        cmd = self._pad([8, 0, 1])
-        return self._echo(cmd, self._cmd(cmd))
+    def _multicast_set(self, value=None):
+        """Enable multicast broadcast on local (client) port 8085)."""
+        return self._cmd(self._pad([8, 0, 1]), False)
 
     multicast = property(_multicast_set, _multicast_set)
 
-    def _unicast_get(self):
-        """Unicast (network wide broadcast on port 8085) (object).
-
-        Set to anything to trigger, check again afterwards.
-        """
-        cmd = self._pad([8, 1])
-        return self._echo(cmd, self._cmd(cmd))
-
     def _unicast_set(self, value=None):
-        """Unicast.
-        Return true or false.
-        """
-        cmd = self._pad([8, 0, 0])
-        return self._echo(cmd, self._cmd(cmd))
+        """Enable unicast broadcast on local (client) port 8085)."""
+        return self._cmd(self._pad([8, 0, 0]), False)
 
-    unicast = property(_unicast_get, _unicast_set)
+    unicast = property(_unicast_set, _unicast_set)
 
     def _version_get(self):
         """Return the device version as tuple."""
@@ -973,11 +1019,11 @@ class Controller(object):
             _('toggle'): self.toggle,
             _('fps'): self.fps,
             _('hdcp'): self.hdcp,
-            _('unicast'): self.unicast,
             _('clients'): self.clients,
             _('firmware'): self.firmware_version,
             _('firmware_str'): self.firmware_version_str,
             _('address'): self.addr,
+            _('unicast'): self.unicast,
         }
 
     def _settings_set(self, properties):

@@ -21,7 +21,7 @@
 #  MA 02110-1301, USA.
 #
 #
-from time import sleep
+import time
 from hs602 import Controller
 
 input('This is an example script to control the HS602 capture '
@@ -90,7 +90,7 @@ print('Picture saturation: {}'.format(device.hue))
 # device.username = 'demo'
 # device.password = 'demo'
 # device.url = 'rtmp://stream.demo.com/demo'
-# device.key = 'demo'
+# device.key = 'demo_password'
 
 # Get rtmp details.
 print('RTMP username: {}'.format(device.username))
@@ -109,33 +109,43 @@ print('Stream (output) bitrate: {}kbps'.format(device.bitrate))
 # "# " to execute).
 # device.toggle = True
 
-# Stop multi/uni-cast.
-device.multicast = False
-device.unicast = False
+# Default to unicast.
+device.unicast = True
 
 q = input('Start UDP stream? (type u for unicast or m for multicast '
           '(unstable!)) -> ')
 
+choice = ''
 if q.lower() == 'm':
-    device.multicast = True
-    print('Stream is available network wide on udp(or rtp)://@:8085\n\n'
-          'Warning, This is pretty much untested, and be aware that '
+    choice = 'multicast'
+    print('Stream will be available network wide on udp/rtp://@:8085\n'
+          '\nWarning, This is pretty much untested, and be aware that '
           'multicast is bandwidth heavy and may swamp your '
           'network. If this happens, use unicast instead.')
 
 elif q.lower() == 'u':
-    device.unicast = True
-    print('Stream is available locally on udp(or rtp)://@:8085).\n'
+    choice = 'unicast'
+    print('Stream will be available locally on udp/rtp://@:8085).\n'
           'Press ctrl + c or close this window to stop streaming..')
 
-else:
-    print('Invalid input, not streaming.')
 
-while device.socket:
-    print('Streaming: {}'.format(device.toggle))
-    print('Client number {}, Client Total: {}'.format(*device.clients))
-    sleep(6)
+msg = 'Strean start/stop at approx {}'
+
+print(msg.format(time.strftime("%a, %d %b %Y %H:%M:%S +0000",
+                               time.gmtime())))
+
+setattr(device, choice, True)
+try:
+    while device.socket:
+        device._cmd([0])
+        time.sleep(8)
+except Exception:
+    print(msg.format(time.strftime("%a, %d %b %Y %H:%M:%S +0000",
+                                   time.gmtime())))
+    raise
 
 # Done
+# Default to unicast (again).
+device.unicast = True
 print(''.ljust(80, '-'))
 input('Goodbye, press any key to exit.')

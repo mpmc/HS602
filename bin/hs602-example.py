@@ -37,7 +37,7 @@ print(''.ljust(80, '-'))
 # one device or none are discovered automatically).
 #
 device = Controller()
-# device = Controller(addr='192.168.1.237')
+# device = Controller(addr='192.168.1.239')
 
 # Device firmware version.
 print("Device firmware version: {}".format(device.firmware_version_str))
@@ -109,43 +109,45 @@ print('Stream (output) bitrate: {}kbps'.format(device.bitrate))
 # "# " to execute).
 # device.toggle = True
 
-# Default to unicast.
-device.unicast = True
+print(''.ljust(80, '-'))
+print('Start stream? Type:-\n\tu for unicast (default)\n\tb for '
+      'multicast (on broadcast)\n\tt for TCP\n\nWARNING, Only '
+      'unicast is stable, all other options may crash your '
+      'device!')
+print(''.ljust(80, '-'))
+q = input('-> ').lower()
 
-q = input('Start UDP stream? (type u for unicast or m for multicast '
-          '(unstable!)) -> ')
-
-choice = ''
-if q.lower() == 'm':
-    choice = 'multicast'
+# Default
+choice = 'unicast'
+if q == 'b':
+    choice = 'broadcast'
     print('Stream will be available network wide on udp/rtp://@:8085\n'
           '\nWarning, This is pretty much untested, and be aware that '
-          'multicast is bandwidth heavy and may swamp your '
-          'network. If this happens, use unicast instead.')
+          'multicast to broadcast is bandwidth heavy and may swamp '
+          'your network. If this happens, use unicast instead.')
 
-elif q.lower() == 'u':
+elif q == 't':
+    choice = 'tcp'
+    print('The stream will be pushed locally to port 8085 over tcp.\n'
+          'E.g. You can use "nc -l 8085 > /tmp/hs602.ts '
+          '| vlc /tmp/hs602.ts" to view the stream.')
+
+else:
     choice = 'unicast'
-    print('Stream will be available locally on udp/rtp://@:8085).\n'
-          'Press ctrl + c or close this window to stop streaming..')
+    print('Stream will be available locally on udp/rtp://@:8085.')
 
+setattr(device, 'stream_mode', choice)
 
-msg = 'Strean start/stop at approx {}'
-
+msg = 'Strean started at approx {}.'
 print(msg.format(time.strftime("%a, %d %b %Y %H:%M:%S +0000",
                                time.gmtime())))
-
-setattr(device, choice, True)
+print('Press ctrl + c or close this window to stop streaming.')
 try:
     while device.socket:
         device._cmd([0])
         time.sleep(8)
-except Exception:
-    print(msg.format(time.strftime("%a, %d %b %Y %H:%M:%S +0000",
-                                   time.gmtime())))
-    raise
-
+except (Exception, KeyboardInterrupt):
+    # Default to unicast (again).
+    setattr(device, 'stream_mode', 'unicast')
 # Done
-# Default to unicast (again).
-device.unicast = True
-print(''.ljust(80, '-'))
-input('Goodbye, press any key to exit.')
+input('Goodbye! Press any key to exit.')

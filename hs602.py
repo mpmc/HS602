@@ -89,6 +89,13 @@ class Controller(object):
                 2: 'ypbpr',
                 3: 'hdmi',
             },
+            'stream': {
+                0: 'unicast',
+                1: 'broadcast',
+                2: 'tcp',
+                3: 'hls',  # HLS requires http server on box.
+                4: 'multicast',
+            },
             'resolution': {
                 0: '1920x1080 60Hz',
                 1: '1280x720 60Hz',
@@ -466,6 +473,8 @@ class Controller(object):
             self.__socket = socket.socket(family=socket.AF_INET,
                                           type=socket.SOCK_STREAM,
                                           proto=socket.IPPROTO_TCP)
+            self.__socket.setsockopt(socket.SOL_SOCKET,
+                                     socket.SO_REUSEADDR, 1)
             self.__socket.settimeout(30)
             self.__socket.connect(addr)
 
@@ -947,25 +956,55 @@ class Controller(object):
 
     hdcp = property(_hdcp_get)
 
-    # You can't actually detect whether the device is in unicast
-    # or multicast mode (via commands). You can only tell it what you
-    # want, hope & pray.
-    #
-    # Also, newer versions of the firmware automatically enable unicast
+    # OK so you CAN detect the mode!
+    # Newer versions of the firmware automatically enable unicast
     # on connect whereas the older firmware won't, a mode must be
     # sent for it to actually stream!
 
-    def _multicast_set(self, value=None):
-        """Enable multicast broadcast on local (client) port 8085)."""
-        return self._cmd(self._pad([8, 0, 1]), False)
+    def _stream_mode_get(self):
+        """Return current local stream mode (int).
 
-    multicast = property(_multicast_set, _multicast_set)
+        See self._properties_get()['stream'] for values.
+        """
+        cmd = self._pad([8, 1])
+        ret = self._cmd(cmd)[0]
+        return ret
 
-    def _unicast_set(self, value=None):
-        """Enable unicast broadcast on local (client) port 8085)."""
-        return self._cmd(self._pad([8, 0, 0]), False)
+    def _stream_mode_set(self, value=None):
+        """Set local stream mode.
 
-    unicast = property(_unicast_set, _unicast_set)
+        :param value: See self._properties_get()['stream'] for values.
+        """
+        opt = self._properties_get()['stream']
+        opt_reverse = {val: key for key, val in opt.items()}
+        mode = None
+        try:
+            value = value.lower()
+        except AttributeError:
+            pass
+
+        if value in opt.keys():
+            mode = value
+        if value in opt_reverse:
+            mode = opt_reverse[value]
+
+        # Bail if mode is not correct.
+        if mode is None:
+            raise ValueError(_('unknown stream mode'))
+        cmd = self._pad([8, 0, mode & 255])
+        return self._echo(cmd, self._cmd(cmd))
+
+    stream_mode = property(_stream_mode_get, _stream_mode_set)
+
+    def _stream_mode_str_get(self):
+        """Return local stream mode as string."""
+        opt = self._properties_get()['stream']
+        mode = self._stream_mode_get()
+        if mode not in opt:
+            raise ValueError(_('invalid stream mode returned'))
+        return opt[mode]
+
+    stream_mode_str = property(_stream_mode_str_get)
 
     def _version_get(self):
         """Return the device version as tuple."""

@@ -37,7 +37,7 @@ print(''.ljust(80, '-'))
 # one device or none are discovered automatically).
 #
 device = Controller()
-# device = Controller(addr='192.168.1.239')
+# device = Controller(addr='192.168.1.111')
 
 # Device firmware version.
 print("Device firmware version: {}".format(device.firmware_version_str))

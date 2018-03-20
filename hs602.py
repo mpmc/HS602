@@ -37,7 +37,8 @@ class Controller(object):
         :param addr: Address of device.
         :param udp: UDP broadcast port.
         :param tcp: TCP command port.
-        :param timeout: UDP Socket timeout. Don't set this to 0 or None.
+        :param udp_timeout: UDP socket timeout.
+        :param udp_timeout: TCP socket timeout.
         :param ping: Message to trigger pong reply.
         :param pong: Expected pong response.
         :param encoding: Message encoding.
@@ -50,17 +51,16 @@ class Controller(object):
         self._addr = self.__addr_broadcast
         self._udp = 8086
         self._tcp = 8087
-        self._timeout = 10
-        self._error = None
+        self._udp_timeout = 5
+        self._tcp_timeout = 10
         self._ping = 'HS602'
         self._pong = 'YES'
         self._encoding = 'utf-8'
         self._cmd_len = 15
-        self._cmd_limit = 30
+        self._cmd_limit = 250
         self.__cmd_count = None
         self.__socket = None
         self.__old_socket = None
-        self.__err_count = None
 
         # Allow kwargs override.
         for key, value in kwargs.items():
@@ -197,7 +197,7 @@ class Controller(object):
         except (socket.error, socket.gaierror, socket.herror,
                 socket.timeout, OSError, AttributeError):
             pass
-        self.__socket = self.__err_count = self.__cmd_count = None
+        self.__socket = self.__cmd_count = None
 
     def __close_old_socket(self):
         """Kill old tcp connection."""
@@ -284,20 +284,35 @@ class Controller(object):
 
     tcp = property(_tcp_get, _tcp_set)
 
-    def _timeout_get(self):
-        """Socket timeout, 0-255 (integer)."""
-        return int(self._timeout)
+    def _udp_timeout_get(self):
+        """UDP socket timeout, 0-255 (integer)."""
+        return int(self._udp_timeout)
 
-    def _timeout_set(self, value):
-        """Set socket timeout.
+    def _udp_timeout_set(self, value):
+        """Set UDP socket timeout.
 
         :param value: timeout value 0-255.
         """
         if not self._valid_int(value):
             return
-        self._timeout = int(value)
+        self._udp_timeout = int(value)
 
-    timeout = property(_timeout_get, _timeout_set)
+    udp_timeout = property(_udp_timeout_get, _udp_timeout_set)
+
+    def _tcp_timeout_get(self):
+        """TCP socket timeout, 0-255 (integer)."""
+        return int(self._tcp_timeout)
+
+    def _tcp_timeout_set(self, value):
+        """Set TCP socket timeout.
+
+        :param value: timeout value 0-255.
+        """
+        if not self._valid_int(value):
+            return
+        self._tcp_timeout = int(value)
+
+    tcp_timeout = property(_tcp_timeout_get, _tcp_timeout_set)
 
     def _cmd_len_get(self):
         """Command length (integer)."""
@@ -389,7 +404,7 @@ class Controller(object):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.settimeout(self._timeout_get())
+            s.settimeout(self._udp_timeout_get())
             s.bind(('', self._udp_get()))
 
             replies = list()
@@ -415,7 +430,7 @@ class Controller(object):
                     break
             return replies
 
-    def _cmd(self, msg, reply=True):
+    def _cmd(self, msg, reply=True, error_count=None):
         """Send command to device - If no address is set
         self.devices_get() will be called & the first device to reply
         is used.
@@ -423,22 +438,10 @@ class Controller(object):
         Return the reply. true if message was sent without error
         (when no reply needed).
 
-        :param msg: message (in bytes) to send.
-        :param reply: do we want to wait for a reply?
+        :param msg: Message (in bytes) to send.
+        :param reply: Do we want to wait for a reply?
+        :param error_count: Internal method error count.
         """
-        def err(zero=False):
-            """Nested error counter.
-
-            :param zero: set to (anything to) reset counter.
-            """
-            if zero:
-                self.__err_count = None
-            try:
-                self.__err_count += 1
-            except TypeError:
-                self.__err_count = 0
-            return self.__err_count
-
         def cmd_count():
             """Nested command counter."""
             try:
@@ -447,6 +450,12 @@ class Controller(object):
                 self.__cmd_count = 0
             self.__cmd_count += 1
             return self.__cmd_count
+
+        # Internal error counter.
+        try:
+            int(error_count)
+        except TypeError:
+            error_count = 0
 
         # Redo the connection/cmd if the command count hits the limit.
         if cmd_count() >= self._cmd_limit_get():
@@ -460,6 +469,7 @@ class Controller(object):
         addr = self._addr_get()
         if not addr or addr.lower() == self.__addr_broadcast.lower():
             self._addr_set(self._devices_get()[0])
+
         # If there is no connection, so tell the device to
         # get ready to accept one.
         #
@@ -475,10 +485,10 @@ class Controller(object):
                                           proto=socket.IPPROTO_TCP)
             self.__socket.setsockopt(socket.SOL_SOCKET,
                                      socket.SO_REUSEADDR, 1)
-            self.__socket.settimeout(30)
+            self.__socket.settimeout(self._tcp_timeout_get())
             self.__socket.connect(addr)
 
-        # Send!!
+        # Send!
         try:
             self.__socket.sendall(msg, 0)
             # Receive reply - Its length should be exactly data_len!
@@ -495,15 +505,17 @@ class Controller(object):
         except (socket.error, socket.gaierror, socket.herror,
                 socket.timeout, OSError):
             # Do we raise an error or try again?
-            if err() >= 2:
+            if error_count >= 2:
                 raise
+            # Try again.
+            error_count += 1
             self._close()
-            return self._cmd(msg, reply)
+            return self._cmd(msg=msg, reply=reply,
+                             error_count=error_count)
 
         # If the reply isn't received properly, send cmd again!
         if not len(data) >= data_len:
-            err()
-            return self._cmd(msg, reply)
+            return self._cmd(msg=msg, reply=reply)
 
         # Close the old socket (if any).
         self.__close_old_socket()
@@ -511,9 +523,6 @@ class Controller(object):
         # Reply or data wanted?
         if not reply:
             data = True
-
-        # Zero the error counter & return the result.
-        err(True)
         return data
 
     def _devices_get(self):

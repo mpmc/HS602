@@ -61,6 +61,9 @@ class Controller(object):
         self.__cmd_count = None
         self.__socket = None
         self.__old_socket = None
+        self.__queued = queue.Queue()
+        self.__thread = threading.Thread(target=self.__process)
+        self.__thread.daemon = True
 
         # Allow kwargs override.
         for key, value in kwargs.items():
@@ -1071,7 +1074,7 @@ class Controller(object):
             _('firmware'): self.firmware_version,
             _('firmware_str'): self.firmware_version_str,
             _('address'): self.addr,
-            _('unicast'): self.unicast,
+            _('stream_mode'): self.stream_mode,
         }
 
     def _settings_set(self, properties):
@@ -1084,20 +1087,8 @@ class Controller(object):
 
     settings = property(_settings_get, _settings_set)
 
-
-class Callback(Controller):
-    """Controller callback."""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._queued = queue.Queue()
-        self.cb = self.callback = self.register = self.queue
-        # Initialise threading.
-        thread = threading.Thread(target=self._process)
-        thread.daemon = True
-        thread.start()
-
-    def queue(self, callback, prop, value=None):
-        """Queue a property set/get callback (threaded).
+    def callback(self, callback, prop, value=None):
+        """Queue a property set/get callback (daemon thread).
 
         :param callback: Callback method - can be set to None.
         :param prop: property or properties to get/set.
@@ -1117,9 +1108,12 @@ class Callback(Controller):
         save = {'key': 'value', 'key2', 'value'}
         obj.queue('settings', save)
         """
-        self._queued.put((prop, value, callback))
+        if not self.__thread.is_alive():
+            self.__thread.start()
 
-    def _process(self):
+        self.__queued.put((prop, value, callback))
+
+    def __process(self):
         """Method to process the queue - this should be threaded."""
         def task(prop, value, callback):
             # Nested method to actually get/set the value.
@@ -1156,5 +1150,5 @@ class Callback(Controller):
         # Process the queue - We don't need to worry about sleeping
         # here as the queue blocks by default.
         while True:
-            prop, value, callback = self._queued.get()
+            prop, value, callback = self.__queued.get()
             task(prop, value, callback)

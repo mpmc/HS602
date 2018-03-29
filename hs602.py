@@ -167,7 +167,7 @@ class Controller(object):
         if value in range(0, 256):
             return True
         raise ValueError(_('invalid value, requires a number between '
-                           '1 and 255'))
+                           '0 and 255'))
 
     @staticmethod
     def _valid_port(value):
@@ -176,7 +176,7 @@ class Controller(object):
         if value in range(0, 65536):
             return True
         raise ValueError(_('invalid value, requires a port number '
-                           'between 1 and 65535'))
+                           'between 0 and 65535'))
 
     @staticmethod
     def _echo(first, second):
@@ -268,7 +268,7 @@ class Controller(object):
     udp = property(_udp_get, _udp_set)
 
     def _tcp_get(self):
-        """TCP command port, 1-65535 (integer).
+        """TCP command port, 0-65535 (integer).
 
         Setting a value will kill existing sockets.
         """
@@ -1052,29 +1052,30 @@ class Controller(object):
         Pass a dictionary to save settings.
         """
         return {
-            _('url'): self.url,
-            _('key'): self.key,
-            _('username'): self.username,
-            _('password'): self.password,
-            _('brightness'): self.brightness,
-            _('contrast'): self.contrast,
-            _('hue'): self.hue,
-            _('saturation'): self.saturation,
-            _('source'): self.source,
-            _('source_str'): self.source_str,
-            _('resolution'): self.resolution,
-            _('resolution_str'): self.resolution_str,
-            _('picture_size'): self.size,
-            _('picture_size_str'): self.size_str,
-            _('bitrate'): self.bitrate,
-            _('toggle'): self.toggle,
-            _('fps'): self.fps,
-            _('hdcp'): self.hdcp,
-            _('clients'): self.clients,
-            _('firmware'): self.firmware_version,
-            _('firmware_str'): self.firmware_version_str,
-            _('address'): self.addr,
-            _('stream_mode'): self.stream_mode,
+            'url': self.url,
+            'key': self.key,
+            'username': self.username,
+            'password': self.password,
+            'brightness': self.brightness,
+            'contrast': self.contrast,
+            'hue': self.hue,
+            'saturation': self.saturation,
+            'source': self.source,
+            'source_str': self.source_str,
+            'resolution': self.resolution,
+            'resolution_str': self.resolution_str,
+            'picture_size': self.size,
+            'picture_size_str': self.size_str,
+            'bitrate': self.bitrate,
+            'toggle': self.toggle,
+            'fps': self.fps,
+            'hdcp': self.hdcp,
+            'clients': self.clients,
+            'firmware': self.firmware_version,
+            'firmware_str': self.firmware_version_str,
+            'address': self.addr,
+            'stream_mode': self.stream_mode,
+            'stream_mode_str': self.stream_mode_str,
         }
 
     def _settings_set(self, properties):
@@ -1143,7 +1144,6 @@ class Controller(object):
                 ret = sub_task(prop, value)
 
             # Now launch the callback.
-            # We don't handle callback Exceptions.
             if callable(callback):
                 callback(ret)
 

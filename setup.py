@@ -47,9 +47,6 @@
 from setuptools import setup
 setup(
     name='hs602',
-    scripts=[
-        'bin/hs602-example',
-    ],
     version='0.2.0.dev1',
     description='A simple HS602 (capture device) controller and tools.',
     keywords='HS602 capture, streaming, broadcasting, rtmp',

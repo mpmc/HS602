@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 #  hs602.py
@@ -1088,14 +1088,14 @@ class Controller(object):
 
     settings = property(_settings_get, _settings_set)
 
-    def callback(self, callback, prop, value=None):
+    def callback(self, callbacks, prop, value=None):
         """Queue a property set/get callback (daemon thread).
 
-        :param callback: Callback method - can be set to None.
+        :param callbacks: Callback method(s) - can be set to None.
         :param prop: property or properties to get/set.
         :param value: optional set value - leave as none to get a value.
 
-        The callback method must accept a single value, note exceptions
+        The callback methods must accept a single value, note exceptions
         are also returned - so be sure to check for those.
 
         If you set prop to a tuple, list or set, a dictionary of the
@@ -1107,12 +1107,12 @@ class Controller(object):
         for example,..
 
         save = {'key': 'value', 'key2', 'value'}
-        obj.queue('settings', save)
+        obj.queue(callback, 'settings', save)
         """
         if not self.__thread.is_alive():
             self.__thread.start()
 
-        self.__queued.put((prop, value, callback))
+        self.__queued.put((prop, value, callbacks))
 
     def __process(self):
         """Method to process the queue - this should be threaded."""
@@ -1143,12 +1143,15 @@ class Controller(object):
             else:
                 ret = sub_task(prop, value)
 
-            # Now launch the callback.
-            if callable(callback):
+            # Inform the callback(s).
+            try:
                 callback(ret)
+            except TypeError:
+                for method in filter(callable, iter(callback)):
+                    method(ret)
 
         # Process the queue - We don't need to worry about sleeping
         # here as the queue blocks by default.
         while True:
-            prop, value, callback = self.__queued.get()
-            task(prop, value, callback)
+            prop, value, callbacks = self.__queued.get()
+            task(prop, value, callbacks)

@@ -22,8 +22,6 @@
 #
 #
 import socket
-import queue
-import threading
 import gettext
 
 gettext.install('Hs602')
@@ -61,9 +59,6 @@ class Controller(object):
         self.__cmd_count = None
         self.__socket = None
         self.__old_socket = None
-        self.__queued = queue.Queue()
-        self.__thread = threading.Thread(target=self.__process)
-        self.__thread.daemon = True
 
         # Allow kwargs override.
         for key, value in kwargs.items():
@@ -1087,71 +1082,3 @@ class Controller(object):
             setattr(self, '{}'.format(name), value)
 
     settings = property(_settings_get, _settings_set)
-
-    def callback(self, callbacks, prop, value=None):
-        """Queue a property set/get callback (daemon thread).
-
-        :param callbacks: Callback method(s) - can be set to None.
-        :param prop: property or properties to get/set.
-        :param value: optional set value - leave as none to get a value.
-
-        The callback methods must accept a single value, note exceptions
-        are also returned - so be sure to check for those.
-
-        If you set prop to a tuple, list or set, a dictionary of the
-        requested properties is returned, value in this case is ignored!
-
-        You can only set a single property, or to set multiple values
-        pass a dictionary to the 'settings' property.
-
-        for example,..
-
-        save = {'key': 'value', 'key2', 'value'}
-        obj.queue(callback, 'settings', save)
-        """
-        if not self.__thread.is_alive():
-            self.__thread.start()
-
-        self.__queued.put((prop, value, callbacks))
-
-    def __process(self):
-        """Method to process the queue - this should be threaded."""
-        def task(prop, value, callback):
-            # Nested method to actually get/set the value.
-            def sub_task(prop, value=None):
-                ret = None
-                prop = '{}'.format(prop)
-                # Are we getting or setting a value?
-                try:
-                    if value:
-                        ret = setattr(self, prop, value)
-                    else:
-                        ret = getattr(self, prop)
-                except Exception as exc:
-                    ret = exc
-                return ret
-
-            # If prop is a set, list or tuple we're getting a selection
-            # of values.
-            ret = item = None
-            selection = {}
-            if isinstance(prop, (list, tuple, set)):
-                for item in prop:
-                    item = '{}'.format(item)
-                    selection[item] = sub_task(item)
-                ret = selection
-            else:
-                ret = sub_task(prop, value)
-
-            # Inform the callback(s).
-            try:
-                callback(ret)
-            except TypeError:
-                for method in filter(callable, iter(callback)):
-                    method(ret)
-
-        # Process the queue - We don't need to worry about sleeping
-        # here as the queue blocks by default.
-        while True:
-            prop, value, callbacks = self.__queued.get()
-            task(prop, value, callbacks)

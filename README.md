@@ -18,7 +18,7 @@ Information and Python module (and soon a GUI) to control the HS602 capture devi
 * Can be used to control a HS602 encoder over the Internet. Although I wouldn't recommend it, it's too insecure! 
 * Simple and easy to understand/use, uses getters/setters.
 * Versions 0.1.1>= are PEP8 compliant.
-* Minimal requirements, uses just threading, queue, socket and gettext (for optional translation).
+* Minimal requirements, uses just socket and gettext (for optional translation).
 
 ## Install
 

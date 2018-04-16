@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 #  setup.py
@@ -21,17 +21,24 @@
 #  MA 02110-1301, USA.
 #
 #
-from setuptools import setup
+from setuptools import setup, find_packages
 setup(
     name='hs602',
-    version='0.2.1.dev1',
-    description='A simple HS602 (capture device) controller and tools.',
-    keywords='HS602 capture, streaming, broadcasting, rtmp',
+    version='0.2.2.dev1',
+    description='HS602 (capture device) controller and utilities.',
+    keywords='HS602, capture, streaming, broadcasting, rtmp',
     author='Mark Clarkstone',
     author_email='git@markclarkstone.co.uk',
     url='https://github.com/mpmc/hs602',
     license='GPL-3.0',
     python_requires='>=3.3',
+    packages=find_packages(),
+    include_package_data=True,
+    entry_points={
+        'console_scripts': [
+            'hs602-example = hs602.Example:main',
+        ]
+    },
     install_requires=[],
     classifiers=[
         'Development Status :: 3 - Alpha',

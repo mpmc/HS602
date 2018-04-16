@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-#  hs602.py
+#  Controller.py
 #
 #  Copyright 2018 Mark Clarkstone <git@markclarkstone.co.uk>
 #
@@ -24,7 +24,7 @@
 import socket
 import gettext
 
-gettext.install('Hs602')
+gettext.install('Hs602controller')
 
 
 class Controller(object):

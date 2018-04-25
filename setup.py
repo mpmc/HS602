@@ -39,7 +39,7 @@ setup(
             'hs602-example = hs602.Example:main',
         ]
     },
-    install_requires=[],
+    install_requires=[''],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Other Audience',

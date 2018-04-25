@@ -38,77 +38,76 @@ def main(*args):
     # one device or none are discovered automatically).
     #
     device = Controller()
-    # device = Controller(addr='192.168.1.111')
+    # device = Controller(addr='192.168.1.254')
 
     # Device firmware version.
-    print("Device firmware version: {}".format(device.firmware_version_str))
+    print("Device firmware version: {}".format(device.firmware()))
 
     # Device address.
     print('Device address: {}'.format(device.addr))
 
     # Connected clients.
-    print('Current client ID / Total clients: {}'.format(device.clients))
+    print('Current client ID / Total clients: {}'.format(device.clients()))
 
     # Flash the LED while get/set-ting device information.
-    device.led = True
+    device.led()
 
-    # Set input source - Uncomment (remove "# " to execute).
-    # use 1 to set analogue / anything else to set hdmi
-    # device.source = 0
+    # Set HDMI or Analogue
+    device.hdmi(True)
 
     # Get input source.
     # Can be just device.source if desired.
-    print('Input source: {}'.format(device.source_str))
+    print('Input source: {}'.format('HDMI' if device.hdmi() else 'Analogue'))
 
     # Get input resolution.
-    print('Input resolution: {}'.format(device.resolution_str))
+    print('Input resolution: {}'.format(device.resolution()))
 
     # Get HDCP value.
-    print('Input HDCP: {}'.format(device.hdcp))
+    print('Input HDCP: {}'.format(device.hdcp()))
 
     # Get frames-per-second.
-    print('FPS: {}'.format(device.fps))
+    print('FPS: {}'.format(device.fps()))
 
     # Set frames-per-second -  Uncomment (remove "# " to execute).
-    # device.fps = 60
+    # device.fps(60)
 
     # Set picture settings - Uncomment (remove "# " to execute).
     # 0 - 255, default 128.
-    # device.size = 1920, 1080
-    # device.brightness = 128
-    # device.contrast = 128
-    # device.hue = 128
-    # device.saturation = 128
+    # device.picture((1920, 1080))
+    # device.brightness(128)
+    # device.contrast(128)
+    # device.hue(128)
+    # device.saturation(128)
 
     # Get picture settings/colours.
-    print('Picture size: {}'.format(device.size_str))
-    print('Picture brightness: {}'.format(device.brightness))
-    print('Picture contrast: {}'.format(device.contrast))
-    print('Picture hue: {}'.format(device.hue))
-    print('Picture saturation: {}'.format(device.hue))
+    print('Picture size: {}'.format(device.picture()))
+    print('Picture brightness: {}'.format(device.brightness()))
+    print('Picture contrast: {}'.format(device.contrast()))
+    print('Picture hue: {}'.format(device.hue()))
+    print('Picture saturation: {}'.format(device.saturation()))
 
     # Set rtmp - Max 255 in length, uncomment (remove "# " to execute).
-    # device.username = 'demo'
-    # device.password = 'demo'
-    # device.url = 'rtmp://stream.demo.com/demo'
-    # device.key = 'demo_password'
+    # device.username('demo')
+    # device.password('demo')
+    # device.url('rtmp://stream.demo.com/demo')
+    # device.key('demo_password')
 
     # Get rtmp details.
-    print('RTMP username: {}'.format(device.username))
-    print('RTMP password: {}'.format(device.password))
-    print('RTMP url: {}'.format(device.url))
-    print('RTMP key: {}'.format(device.key))
+    print('RTMP username: {}'.format(device.username()))
+    print('RTMP password: {}'.format(device.password()))
+    print('RTMP url: {}'.format(device.url()))
+    print('RTMP key: {}'.format(device.key()))
 
-    # Set stream average bitrate - 500 - 8000
-    # Uncomment (remove "# " to execute).
-    # device.bitrate = 10000
+    # Set stream average bitrate - 500 - 15000
+    device.bitrate(10000)
 
     # Get streaming bitrate.
-    print('Stream (output) bitrate: {}kbps'.format(device.bitrate))
+    print('Stream (output) bitrate: {}kbps'.format(device.bitrate()))
 
-    # Toggle streaming - you can set any value here, uncomment (remove
-    # "# " to execute).
-    # device.toggle = True
+    # RTMP Streaming.
+    # You can set any value here, uncomment (remove # to execute).
+    # device.toggle(True)
+    print('Streaming to RTMP server: {}'.format(device.toggle()))
 
     print(''.ljust(80, '-'))
     print('Start stream? Type:-\n\tu for unicast (default)\n\tb for '
@@ -118,8 +117,6 @@ def main(*args):
     print(''.ljust(80, '-'))
     q = input('-> ').lower()
 
-    # Default
-    choice = 'unicast'
     if q == 'b':
         choice = 'broadcast'
         print('Stream will be available network wide on udp/rtp://@:8085\n'
@@ -137,19 +134,15 @@ def main(*args):
         choice = 'unicast'
         print('Stream will be available locally on udp/rtp://@:8085.')
 
-    setattr(device, 'stream_mode', choice)
+    device.mode(choice)
 
     msg = 'Strean started at approx {}.'
     print(msg.format(time.strftime("%a, %d %b %Y %H:%M:%S +0000",
                                    time.gmtime())))
     print('Press ctrl + c or close this window to stop streaming.')
-    try:
-        while device.socket:
-            device._cmd([0])
-            time.sleep(8)
-    except (Exception, KeyboardInterrupt):
-        # Default to unicast (again).
-        setattr(device, 'stream_mode', 'unicast')
+    while True:
+        device.led()
+        time.sleep(3)
     # Done
     input('Goodbye! Press any key to exit.')
 

@@ -22,7 +22,7 @@
 #
 #
 import time
-from hs602 import Controller
+import hs602
 
 
 def main(*args):
@@ -37,9 +37,9 @@ def main(*args):
     # There is usually no need to set an addr (unless you have more than
     # one device or none are discovered automatically).
     #
-    devices = Controller.discover()
+    devices = hs602.Controller.discover()
     try:
-        device = Controller(devices[0])
+        device = hs602.Controller(devices[0])
     except Exception:
         print('No devices? Has it crashed?')
         raise

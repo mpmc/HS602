@@ -22,8 +22,8 @@
 #
 #
 import socket
-import gettext
 import queue
+import gettext
 
 gettext.install('Hs602controller')
 
@@ -47,6 +47,10 @@ class Controller(object):
         self.__cmd_len = 15
         self.__cache = {}
         self.__queue = queue.Queue()
+
+        if not self.__addr:
+            return
+
         self._cache_()
 
     @property
@@ -145,7 +149,7 @@ class Controller(object):
         return value
 
     @staticmethod
-    def udp_msg(addr, port, msg, reply=True, timeout=10,
+    def udp_msg(addr, port, msg, reply=True, timeout=5,
                 encoding='utf-8'):
         """Send a UDP message.
 
@@ -153,18 +157,18 @@ class Controller(object):
         :param port: Port to send the message on.
         :param msg: Message to send (will be converted to bytes).
         :param reply: Optional, is reply needed? - default True.
-        :param timeout: Optional socket timeout - default 10.
+        :param timeout: Optional socket timeout - default 5.
         :param encoding: Optional message encoding - default utf-8.
         """
         msg = __class__.bytes(msg, encoding)
         with __class__.new_socket(addr='', port=port, timeout=timeout,
-                                  udp=True) as s:
+                                  udp=True) as sock:
             replies = list()
             sent = 0
             while True:
                 # Send message.
                 if msg:
-                    sent = s.sendto(msg, (addr, port))
+                    sent = sock.sendto(msg, (addr, port))
                     if not sent > 0:
                         break
                     msg = msg[sent:]
@@ -174,7 +178,7 @@ class Controller(object):
                 if not reply:
                     return True
                 try:
-                    data, [addr, port] = s.recvfrom(2048)
+                    data, [addr, port] = sock.recvfrom(2048)
                     replies += [[addr, port, data]]
                 except (socket.error, socket.gaierror,
                         socket.herror, socket.timeout, OSError):
@@ -215,6 +219,27 @@ class Controller(object):
             return sock
         except Exception as exc:
             raise Exception(_('can\'t connect or bind')) from exc
+
+    @staticmethod
+    def udp_stream(port=8085):
+        """Receive raw stream data from UDP.
+        :param port: Port to receive the stream from.
+        """
+        def _sock():
+            sock = __class__.new_socket(addr=None, timeout=5, bind=True,
+                                        port=__class__.port(port),
+                                        udp=True)
+            return sock
+
+        sock = _sock()
+        while True:
+            try:
+                data = sock.recvfrom(65535)
+                if data:
+                    yield data[0]
+            except (socket.error, socket.gaierror, socket.herror,
+                    socket.timeout, BlockingIOError, OSError):
+                continue
 
     @staticmethod
     def discover(**kwargs):
@@ -272,9 +297,7 @@ class Controller(object):
             except queue.Empty:
                 # Update the cache.
                 self.__backlog_('cache')
-                if blocking:
-                    pass
-                else:
+                if not blocking:
                     break
 
     def _cmd(self, msg, **kwargs):
@@ -313,7 +336,7 @@ class Controller(object):
             # Don't loop if data_len is zero.
             while True and int(data_len) > 0:
                 # Receive reply.
-                buf = self.__socket.recv(2048)
+                buf = self.__socket.recv(1024)
                 if not buf:
                     self._close()
                     break
@@ -328,8 +351,8 @@ class Controller(object):
             self._close()
             return self._cmd(msg, retry=True)
 
-        # Return the response
-        return data[:data_len]
+        # Return the response.
+        return data
 
     def _close(self):
         """Kill active TCP connection & clean-up."""
@@ -636,7 +659,7 @@ class Controller(object):
         }
         ret = self._cmd(__class__.pad([4, 1], self.__cmd_len))[0] & 255
         if not resolutions.get(ret):
-            raise Exception(_('unknown resolution value returned'))
+            raise Exception(_('invalid resolution value returned'))
         return resolutions.get(ret)
 
     @property

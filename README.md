@@ -16,9 +16,9 @@ Information and Python module (and soon a GUI) to control the HS602 capture devi
 * Streaming toggling (start, stop streaming).
 * Set/Get various parameters, rtmp, colour, source, bitrate, **and more - that Shareview can't do**.
 * Can be used to control a HS602 encoder over the Internet. Although I wouldn't recommend it, it's too insecure!
-* Simple and easy to understand/use, uses getters/setters.
+* Simple and easy to understand/use (hopefully ;) ).
 * Versions 0.1.1>= are PEP8 compliant.
-* Minimal requirements, uses just socket, queue and gettext (for optional translation).
+* Minimal requirements, uses just socket, concurrent.futures (for callbacks (coming soon)) and gettext (for optional translation).
 
 ## Install
 

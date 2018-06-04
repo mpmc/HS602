@@ -21,10 +21,11 @@
 #  MA 02110-1301, USA.
 #
 #
+import hs602
 from setuptools import setup, find_packages
 setup(
     name='hs602',
-    version='0.3.0.dev1',
+    version=hs602._VERSION_,
     description='HS602 (capture device) controller and utilities.',
     keywords='HS602, capture, streaming, broadcasting, rtmp',
     author='Mark Clarkstone',

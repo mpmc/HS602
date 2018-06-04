@@ -21,11 +21,11 @@
 #  MA 02110-1301, USA.
 #
 #
+
 import socket
-import queue
 import gettext
 
-gettext.install('Hs602controller')
+gettext.install('Hs602_controller')
 
 
 class Controller(object):
@@ -34,54 +34,25 @@ class Controller(object):
         """Initialise the controller.
 
         :param addr: Address of device.
-        :param tcp: Optional TCP (command) port - default 8087.
-        :param udp: Optional UDP (broadcast) port - default 8086.
-        :param timeout: Optional TCP/UDP socket timeout - default 10.
+        :param tcp: TCP (command) port - default 8087.
+        :param udp: UDP (broadcast) port - default 8086.
+        :param listen: Stream input port - default 8085.
+        :param timeout: TCP/UDP socket timeout - default 10.
         """
-        self.__addr = __class__.str(addr)
-        self.__tcp = int(kwargs.get('tcp', 8087))
-        self.__udp = int(kwargs.get('udp', 8086))
-        self.__timeout = int(kwargs.get('timeout', 10))
+        self.addr = __class__.str(addr)
+        self.tcp = int(kwargs.get('tcp', 8087))
+        self.udp = int(kwargs.get('udp', 8086))
+        self.listen = int(kwargs.get('listen', 8085))
+        self.timeout = int(kwargs.get('timeout', 10))
 
-        self.__socket = None
-        self.__cmd_len = 15
-        self.__cache = {}
-        self.__queue = queue.Queue()
-
-        if not self.__addr:
-            return
-
-        self._cache_()
-
-    @property
-    def addr(self):
-        """Current device address."""
-        return self.__addr
-
-    @property
-    def tcp(self):
-        """TCP (command) port."""
-        return self.__tcp
-
-    @property
-    def udp(self):
-        """UDP port."""
-        return self.__udp
-
-    @property
-    def timeout(self):
-        """Socket timeout."""
-        return self.__timeout
-
-    @timeout.setter
-    def timeout(self, value):
-        self.__timeout = __class__.int(value)
+        self.socket = None
+        self.cmd_len = 15
 
     @staticmethod
     def str(value):
-        """Return true if string value is 1 - 255 in length.
+        """Value is string of 1 - 255 in length.
 
-        :param value: value to check.
+        :param value: Value to check.
         """
         value = '{}'.format(value).strip()
         if len(value) in range(1, 256):
@@ -91,9 +62,9 @@ class Controller(object):
 
     @staticmethod
     def int(value):
-        """Return true if int value is 0 - 255.
+        """Value is int 0 - 255.
 
-        :param value: value to check.
+        :param value: Value to check.
         """
         value = round(int(value))
         if value in range(0, 256):
@@ -103,9 +74,9 @@ class Controller(object):
 
     @staticmethod
     def port(value):
-        """Return true if port int value is 0 - 65535.
+        """Value is int 0 - 65535.
 
-        :param value: value to check.
+        :param value: Value to check.
         """
         value = round(int(value))
         if value in range(0, 65536):
@@ -115,7 +86,7 @@ class Controller(object):
 
     @staticmethod
     def echo(first, second):
-        """Check if two variables are equal.
+        """Test if two variables are equal.
 
         :param first: First object.
         :param second: Second object.
@@ -123,20 +94,20 @@ class Controller(object):
         return first == second
 
     @staticmethod
-    def pad(data, pad=None):
-        """Pad data
+    def pad(data, pad=15):
+        """Pad data.
 
         :param data: Data to pad, must be a list!
         :param pad: Size required - default 15.
         """
 
-        pad = pad or 15
+        pad = __class__.int(pad)
         data = bytes(data)
         return data.ljust(pad, b'\0')
 
     @staticmethod
     def bytes(value, encoding='utf-8'):
-        """Return the encoded bytes of value.
+        """Encode bytes.
 
         :param value: Data to encode.
         :param encoding: Data encoding.
@@ -156,13 +127,13 @@ class Controller(object):
         :param addr: Host address.
         :param port: Port to send the message on.
         :param msg: Message to send (will be converted to bytes).
-        :param reply: Optional, is reply needed? - default True.
-        :param timeout: Optional socket timeout - default 5.
-        :param encoding: Optional message encoding - default utf-8.
+        :param reply: Is reply needed?
+        :param timeout: Socket timeout.
+        :param encoding: Message encoding.
         """
         msg = __class__.bytes(msg, encoding)
-        with __class__.new_socket(addr='', port=port, timeout=timeout,
-                                  udp=True) as sock:
+        with __class__.sock(addr='', port=port, timeout=timeout,
+                            udp=True) as sock:
             replies = list()
             sent = 0
             while True:
@@ -186,14 +157,14 @@ class Controller(object):
             return replies
 
     @staticmethod
-    def new_socket(addr, port, timeout, bind=False, udp=False):
+    def sock(addr, port, timeout, bind=False, udp=False):
         """Make a new connection.
 
         :param addr: Address of host.
         :param port: Port of host.
         :param timeout: Socket timeout.
         :param bind: Bind rather than connect.
-        :param udp: Create a UDP socket, will bind automatically.
+        :param udp: Create a UDP socket - will bind automatically.
         """
         port = __class__.port(port)
         timeout = __class__.int(timeout)
@@ -210,6 +181,7 @@ class Controller(object):
                 sock.setsockopt(socket.IPPROTO_TCP,
                                 socket.TCP_NODELAY, 1)
 
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.settimeout(timeout)
             if bind:
@@ -221,38 +193,16 @@ class Controller(object):
             raise Exception(_('can\'t connect or bind')) from exc
 
     @staticmethod
-    def udp_stream(port=8085):
-        """Receive raw stream data from UDP.
-        :param port: Port to receive the stream from.
-        """
-        def _sock():
-            sock = __class__.new_socket(addr=None, timeout=5, bind=True,
-                                        port=__class__.port(port),
-                                        udp=True)
-            return sock
-
-        sock = _sock()
-        while True:
-            try:
-                data = sock.recvfrom(65535)
-                if data:
-                    yield data[0]
-            except (socket.error, socket.gaierror, socket.herror,
-                    socket.timeout, BlockingIOError, OSError):
-                continue
-
-    @staticmethod
     def discover(**kwargs):
         """Get a list of available devices.
 
         :param ping: Ping message - default 'HS602'.
         :param pong: Pong message - default 'YES'.
         :param encoding: Message encoding - default 'utf-8'.
-        :param broadcast: Optional address to send message - default
+        :param broadcast: Address to send message - default
         '<broadcast>'.
-        :param udp: Optional port on which to send message - default
+        :param udp: Port on which to send message - default
         8086.
-
         """
         broadcast = str(kwargs.get('broadcast', '<broadcast>'))
         encoding = str(kwargs.get('encoding', 'utf-8'))
@@ -267,54 +217,20 @@ class Controller(object):
             raise Exception('discovery failure') from exc
         return [rep[0] for rep in ret if rep[2] == pong]
 
-    def __backlog_(self, key, value=None):
-        """Queue up setting of properties.
-
-        :param key: Name of the property.
-        :param value: Value property value.
-        """
-        # Queue!
-        self.__queue.put((key, value), block=False)
-
-    def commit(self, blocking=False, timeout=5):
-        """Refresh and save settings, update cache.
-
-        :param blocking: Use a blocking queue - default False.
-        :param timeout: Maximum time to block.
-
-        If blocking make sure to thread this!
-        """
-        while True:
-            try:
-                key, value = self.__queue.get(block=blocking,
-                                              timeout=timeout)
-                method = getattr(self, '_{}_'.format(key))
-                if value:
-                    method(value)
-                    self.__cache.update({key: value})
-                else:
-                    method()
-            except queue.Empty:
-                # Update the cache.
-                self.__backlog_('cache')
-                if not blocking:
-                    break
-
-    def _cmd(self, msg, **kwargs):
+    def cmd(self, msg, **kwargs):
         """Send command to device.
 
         :param msg: Message to send.
-        :param retry: Is this a retry?
         """
         msg = __class__.bytes(msg)
-        data_len = self.__cmd_len
+        data_len = self.cmd_len
 
         # We need an address!
         if not self.addr:
             raise ValueError(_('an address is required'))
 
         # Do we require a new socket?
-        if not self.__socket or kwargs.get('retry', False):
+        if not self.socket or kwargs.get('retry', False):
             try:
                 # Knock.
                 addr = socket.gethostbyname(self.addr)
@@ -326,57 +242,51 @@ class Controller(object):
                 raise Exception(_('failed to knock device')) from exc
 
             # Connect!
-            self.__socket = __class__.new_socket(addr=self.addr,
-                                                 port=self.tcp,
-                                                 timeout=self.timeout)
-        # Send!
+            self.socket = __class__.sock(addr=self.addr, port=self.tcp,
+                                         timeout=self.timeout)
         try:
-            self.__socket.sendall(msg, 0)
+            # Send!
+            self.socket.sendall(msg, 0)
             data = bytes()
-            # Don't loop if data_len is zero.
-            while True and int(data_len) > 0:
+
+            while True:
                 # Receive reply.
-                buf = self.__socket.recv(1024)
+                buf = self.socket.recv(1024)
                 if not buf:
-                    self._close()
-                    break
+                    raise OSError(_('socket dead'))
                 data += buf
+                # Return the response.
                 if len(data) >= data_len:
-                    break
-        except (socket.error, socket.gaierror, socket.herror,
-                socket.timeout, OSError) as exc:
-            # Is this a retry?
-            if kwargs.get('retry', False):
-                raise Exception(_('failed to send command')) from exc
-            self._close()
-            return self._cmd(msg, retry=True)
+                    return data
+        except Exception as exc:
+            self.close()
+            raise Exception(_('failed to send command')) from exc
 
-        # Return the response.
-        return data
-
-    def _close(self):
-        """Kill active TCP connection & clean-up."""
+    def close(self):
+        """Close connection(s)."""
         try:
             # If this fails we can ignore it.
-            self.__socket.shutdown(socket.SHUT_RDWR)
-            self.__socket.close()
+            self.socket.shutdown(socket.SHUT_RDWR)
+            self.socket.close()
         except (socket.error, socket.gaierror, socket.herror,
                 socket.timeout, OSError, AttributeError):
             pass
-        # Reset!
-        self.__queue = queue.Queue()
+        self.socket = None
 
-    def _rtmp_(self, param, value=None):
-        """Get or set an RTMP value.
+    stop = close
+
+    def rtmp(self, param, value=None):
+        """Set/Get RTMP value.
 
         :param param: Desired value: url, key, username or password.
-        :param value: Optional value to set.
+        :param value: Value to set.
         """
         params = {
             'url': 16,
             'key': 17,
             'username': 20,
             'password': 21,
+            'name': 23,
         }
         # Whats the param?
         param = params.get(str(param).lower())
@@ -384,107 +294,80 @@ class Controller(object):
         if not param:
             raise Exception(_('unknown rtmp param, must be one of: '
                               '{}'.format(list(params.keys()))))
-        # Setting.
+        # Set.
         if value:
             # Is what we're setting too long?
             __class__.str(value)
             for pos, char in enumerate(value):
                 char_cmd = __class__.pad(cmd + [pos, ord(char)],
-                                         self.__cmd_len)
-                if not __class__.echo(char_cmd, self._cmd(char_cmd)):
+                                         self.cmd_len)
+                if not __class__.echo(char_cmd, self.cmd(char_cmd)):
                     raise Exception(_('setting rtmp value failed'))
             # Has the box accepted the setting?
-            cmd = __class__.pad(cmd + [len(value), 0], self.__cmd_len)
-            return __class__.echo(cmd, self._cmd(cmd))
+            cmd = __class__.pad(cmd + [len(value), 0], self.cmd_len)
+            return __class__.echo(cmd, self.cmd(cmd))
 
-        # Getting.
+        # Get.
         cmd = [param, 1]
         buf = ''
         for pos in range(0, 255):
-            dec = int(self._cmd(cmd + [pos])[0] & 255)
+            dec = int(self.cmd(cmd + [pos])[0] & 255)
             if not dec:
                 break
             buf += chr(dec)
         return buf
 
-    def _url_(self, value=None):
-        """Get or set the RTMP URL.
+    def url(self, value=None):
+        """Set/Get the RTMP URL.
 
-        :param value: Optional RTMP URL to set.
+        :param value: RTMP URL to set.
         """
-        if value:
-            return self._rtmp_('url', value)
-        return self._rtmp_('url')
+        if value is not None:
+            return self.rtmp('url', value)
+        return self.rtmp('url')
 
-    @property
-    def url(self):
-        """RTMP URL."""
-        return self.__cache['url']
+    def key(self, value=None):
+        """Set/Get the RTMP key.
 
-    @url.setter
-    def url(self, value):
-        self.__backlog_('url', value)
-
-    def _key_(self, value=None):
-        """Get or set the RTMP key.
-
-        :param value: Optional RTMP key to set.
+        :param value: RTMP key to set.
         """
-        if value:
-            return self._rtmp_('key', value)
-        return self._rtmp_('key')
+        if value is not None:
+            return self.rtmp('key', value)
+        return self.rtmp('key')
 
-    @property
-    def key(self):
-        """RTMP key."""
-        return self.__cache['key']
+    def username(self, value=None):
+        """Set/Get the RTMP username.
 
-    @key.setter
-    def key(self, value):
-        self.__backlog_('key', value)
-
-    def _username_(self, value=None):
-        """Get or set the RTMP username.
-
-        :param value: Optional RTMP username to set.
+        :param value: RTMP username to set.
         """
-        if value:
-            return self._rtmp_('username', value)
-        return self._rtmp_('username')
+        if value is not None:
+            return self.rtmp('username', value)
+        return self.rtmp('username')
 
-    @property
-    def username(self):
-        """RTMP username."""
-        return self.__cache['username']
+    def password(self, value=None):
+        """Set/Get the RTMP password.
 
-    @username.setter
-    def username(self, value):
-        self.__backlog_('username', value)
-
-    def _password_(self, value=None):
-        """Get or set the RTMP password.
-
-        :param value: Optional RTMP password to set.
+        :param value: RTMP password to set.
         """
-        if value:
-            return self._rtmp_('password', value)
-        return self._rtmp_('password')
+        if value is not None:
+            return self.rtmp('password', value)
+        return self.rtmp('password')
 
-    @property
-    def password(self):
-        """RTMP password."""
-        return self.__cache['password']
+    def name(self, value=None):
+        """Set/Get the RTMP channel name.
 
-    @password.setter
-    def password(self, value):
-        self.__backlog_('password', value)
+        :param value: RTMP name to set.
+        """
+        if value is not None:
+            return self.rtmp('name', value)
+        return self.rtmp('name')
 
-    def _colour_(self, param, value=None):
-        """Get or set a colour value.
+    def colour(self, param, value=None):
+        """Set/Get a colour value.
 
         :param param: Desired value: brightness, contrast, hue or
         saturation.
-        param value: Optional value to set, 0 - 255
+        param value: Value to set, 0 - 255
         """
         params = {
             'brightness': 0,
@@ -497,120 +380,70 @@ class Controller(object):
             raise Exception(_('unknown colour param, must be one of: '
                               '{}'.format(list(params.keys()))))
         # Set colour.
-        if value:
+        if value is not None:
             __class__.int(value)
-            cmd = __class__.pad([10, 0, param, value], self.__cmd_len)
-            return __class__.echo(cmd, self._cmd(cmd))
+            cmd = __class__.pad([10, 0, param, value], self.cmd_len)
+            return __class__.echo(cmd, self.cmd(cmd))
 
         # Get colour.
-        return int(self._cmd([10, 1, param])[0] & 255)
+        return int(self.cmd([10, 1, param])[0] & 255)
 
-    _color_ = _colour_
+    def brightness(self, value=None):
+        """Set/Get brightness.
 
-    def _brightness_(self, value=None):
-        """Get or set the colour brightness.
-
-        :param value: Optional brightness level, 0 - 255 - default 128.
+        :param value: Brightness level, 0 - 255 - default 128.
         """
-        if value:
-            return self._colour_('brightness', value)
-        return self._colour_('brightness')
+        if value is not None:
+            return self.colour('brightness', value)
+        return self.colour('brightness')
 
-    @property
-    def brightness(self):
-        """Output brightness."""
-        return self.__cache['brightness']
+    def contrast(self, value=None):
+        """Set/Get contrast.
 
-    @brightness.setter
-    def brightness(self, value):
-        self.__backlog_('brightness', value)
-
-    def _contrast_(self, value=None):
-        """Get or set the colour contrast.
-
-        :param value: Optional contrast level, 0 - 255 - default 128.
+        :param value: Contrast level, 0 - 255 - default 128.
         """
-        if value:
-            return self._colour_('contrast', value)
-        return self._colour_('contrast')
+        if value is not None:
+            return self.colour('contrast', value)
+        return self.colour('contrast')
 
-    @property
-    def contrast(self):
-        """Output contrast."""
-        return self.__cache['contrast']
+    def hue(self, value=None):
+        """Set/Get hue.
 
-    @contrast.setter
-    def contrast(self, value):
-        self.__backlog_('contrast', value)
-
-    def _hue_(self, value=None):
-        """Get or set the colour hue.
-
-        :param value: Optional hue level, 0 - 255 - default 128.
+        :param value: Hue level, 0 - 255 - default 128.
         """
-        if value:
-            return self._colour_('hue', value)
-        return self._colour_('hue')
+        if value is not None:
+            return self.colour('hue', value)
+        return self.colour('hue')
 
-    @property
-    def hue(self):
-        """Output hue."""
-        return self.__cache['hue']
+    def saturation(self, value=None):
+        """Set/Get saturation.
 
-    @hue.setter
-    def hue(self, value):
-        self.__backlog_('hue', value)
-
-    def _saturation_(self, value=None):
-        """Get or set the colour saturation.
-
-        :param value: Optional saturation level, 0 - 255 - default 128.
+        :param value: Saturation level, 0 - 255 - default 128.
         """
-        if value:
-            return self._colour_('saturation', value)
-        return self._colour_('saturation')
+        if value is not None:
+            return self.colour('saturation', value)
+        return self.colour('saturation')
 
-    @property
-    def saturation(self):
-        """Output saturation."""
-        return self.__cache['saturation']
+    def hdmi(self, value=None):
+        """Set/Get source input - HDMI or Analogue.
 
-    @saturation.setter
-    def saturation(self, value):
-        self.__backlog_('saturation', value)
-
-    def _hdmi_(self, value=None):
-        """Get or set current input source.
-
-        :param value: Optional, set to true to switch to HDMI or
-        false to switch to analogue.
-
-        If no value is passed this will return true if input is
-        HDMI or false if analogue.
+        :param value: True for HDMI, False for analogue.
         """
         if value is not None:
             cmd = [1, 0, 2]
             if value:
                 cmd = [1, 0, 3]
-            cmd = __class__.pad(cmd, self.__cmd_len)
-            return __class__.echo(cmd, self._cmd(cmd))
+
+            cmd = __class__.pad(cmd, self.cmd_len)
+            self.cmd(cmd)
 
         # Get value.
-        ret = self._cmd(__class__.pad([1, 1], self.__cmd_len))[0] & 255
+        ret = self.cmd(__class__.pad([1, 1], self.cmd_len))[0] & 255
         if ret not in [2, 3]:
             raise Exception(_('invalid source number returned'))
         return True if ret is 3 else False
 
-    @property
-    def hdmi(self):
-        """HDMI or analogue input."""
-        return self.__cache['hdmi']
-
-    @hdmi.setter
-    def hdmi(self, value):
-        self.__backlog_('hdmi', value)
-
-    def _resolution_(self):
+    def resolution(self):
         """Get current input resolution."""
         resolutions = {
             0: '1920x1080 60Hz',
@@ -657,20 +490,15 @@ class Controller(object):
             41: '1600x900 60Hz',
             42: '1680x1050 60Hz',
         }
-        ret = self._cmd(__class__.pad([4, 1], self.__cmd_len))[0] & 255
+        ret = self.cmd(__class__.pad([4, 1], self.cmd_len))[0] & 255
         if not resolutions.get(ret):
             raise Exception(_('invalid resolution value returned'))
         return resolutions.get(ret)
 
-    @property
-    def resolution(self):
-        """Input resolution."""
-        return self.__cache['resolution']
+    def picture(self, value=None):
+        """Set/Get RTMP output picture size.
 
-    def _picture_(self, value=None):
-        """Get or set RTMP output picture size.
-
-        :param value: Optional RTMP picture size. Set as two values,
+        :param value: RTMP picture size. Set as two values,
         e.g, "1920, 1080".
 
         This is width by height.
@@ -678,7 +506,13 @@ class Controller(object):
         w_range = range(0, 1921)
         h_range = range(0, 1081)
 
-        if value:
+        if value is not None:
+            # Try a string split.
+            try:
+                value = value.split(',', 2)
+            except AttributeError:
+                pass
+
             try:
                 width = int(value[0])
                 height = int(value[1])
@@ -701,11 +535,11 @@ class Controller(object):
                 (width >> 16) & 255,
                 (width >> 24) & 255,
             ]
-            cmd = __class__.pad([3, 0] + width + height, self.__cmd_len)
-            return __class__.echo(cmd, self._cmd(cmd))
+            cmd = __class__.pad([3, 0] + width + height, self.cmd_len)
+            return __class__.echo(cmd, self.cmd(cmd))
 
         # Get the picture width/height.
-        ret = self._cmd(__class__.pad([3, 1], self.__cmd_len))
+        ret = self.cmd(__class__.pad([3, 1], self.cmd_len))
 
         height = (
             ret[0] & 255 +
@@ -726,28 +560,18 @@ class Controller(object):
                                                            height))
         return width, height
 
-    @property
-    def picture(self):
-        """Output picture size."""
-        return self.__cache['picture']
+    def bitrate(self, value=None):
+        """Set/Get the average RTMP bitrate.
 
-    @picture.setter
-    def picture(self, value):
-        self.__backlog_('picture', value)
-
-    def _bitrate_(self, value=None):
-        """Get or set the average RTMP bitrate.
-
-        :param value: Optional average bitrate to set,
-        500 - 15000 - default 15000.
+        :param value: Average bitrate to set, 500 - 20000.
         """
-        if value:
+        if value is not None:
             try:
                 average = int(value)
-                if average not in range(500, 15001):
+                if average not in range(500, 20001):
                     raise ValueError
             except (TypeError, ValueError):
-                average = 15000
+                average = 20000
             low = int(average * 7 / 10)
             high = int(average * 13 / 10)
             average = [
@@ -768,52 +592,35 @@ class Controller(object):
                 (high >> 16) & 255,
                 (high >> 24) & 255,
             ]
+
             cmd = __class__.pad([2, 0] + average + low + high,
-                                self.__cmd_len)
-            return __class__.echo(cmd, self._cmd(cmd))
+                                self.cmd_len)
+            return __class__.echo(cmd, self.cmd(cmd))
 
         # Get value.
-        ret = self._cmd(__class__.pad([2, 1]))
+        ret = self.cmd(__class__.pad([2, 1]))
         onezero = (ret[1] & 255) << 8 | (ret[0] & 255)
         twothree = (ret[2] & 255) << 16 | (ret[3] & 255) << 24
         return onezero | twothree
 
-    @property
-    def bitrate(self):
-        """Output bitrate."""
-        return self.__cache['bitrate']
-
-    @bitrate.setter
-    def bitrate(self, value):
-        self.__backlog_('bitrate', value)
-
-    def _toggle_(self, value=None):
-        """Get or set RTMP stream state.
+    def toggle(self, value=None):
+        """Set/Get RTMP stream state.
 
         :param value: Set to toggle RTMP streaming state.
         """
         if value:
-            cmd = __class__.pad([15, 0], self.__cmd_len)
-            return __class__.echo(cmd, self._cmd(cmd))
+            cmd = __class__.pad([15, 0], self.cmd_len)
+            return __class__.echo(cmd, self.cmd(cmd))
         # Get current value.
-        cmd = __class__.pad([15, 1], self.__cmd_len)
-        return bool(self._cmd(cmd)[0] & 255)
+        cmd = __class__.pad([15, 1], self.cmd_len)
+        return bool(self.cmd(cmd)[0] & 255)
 
-    @property
-    def toggle(self):
-        """RTMP stream toggle."""
-        return self.__cache['toggle']
-
-    @toggle.setter
-    def toggle(self, value):
-        self.__backlog_('toggle', value)
-
-    def _fps_(self, value=None):
-        """Get or set RTMP frames-per-second.
+    def fps(self, value=None):
+        """Set/Get RTMP frames-per-second.
 
         :param value: Frames-per-second, 1 - 60.
         """
-        if value:
+        if value is not None:
             __class__.int(value)
             if value not in range(1, 61):
                 value = 60
@@ -825,92 +632,60 @@ class Controller(object):
                 (value >> 24) & 255,
             ]
             return __class__.echo(__class__.pad([19, 0] + fps),
-                                  self.__cmd_len)
+                                  self.cmd_len)
         # Get!
-        return self._cmd(__class__.pad([19, 1],
-                                       self.__cmd_len))[0] & 255
+        return self.cmd(__class__.pad([19, 1], self.cmd_len))[0] & 255
 
-    @property
-    def fps(self):
-        """Frames-per-second."""
-        return self.__cache['fps']
+    def mode(self, value=None):
+        """Set/Get RTP/UDP stream mode.
 
-    @fps.setter
-    def fps(self, value):
-        self.__backlog_('fps', value)
+        :param value: Desired stream mode: unicast, broadcast, tcp.
 
-    def _led_(self, value=None):
-        """Flash the LED."""
-        cmd = [55, 0, 1]
-        cmd = __class__.pad(cmd, self.__cmd_len)
-        return __class__.echo(cmd, self._cmd(cmd))
-
-    @property
-    def led(self):
-        """Flash the LED."""
-        pass
-
-    @led.setter
-    def led(self, value):
-        self.__backlog_('led', None)
-
-    def _hdcp_(self):
-        """Get HDCP status."""
-        cmd = [5, 1]
-        cmd = __class__.pad(cmd, self.__cmd_len)
-        return bool(self._cmd(cmd)[0] & 255)
-
-    @property
-    def hdcp(self):
-        """HDMI copy protection active."""
-        return self.__cache['hdcp']
-
-    def _mode_(self, value=None):
-        """Get or set RTP/UDP stream mode.
-
-        :param value: Desired stream mode: unicast, broadcast, tcp
-        hls or multicast
-
-        Output is on port 8085.
+        The device (by default) outputs on port 8085.
         """
-        modes = {
-            0: 'unicast',
-            1: 'broadcast',
-            2: 'tcp',
-            3: 'hls',  # HLS requires http server on box.
-            4: 'multicast',
-        }
-        # Set.
-        if value:
-            __class__.str(value)
 
-            mode = None
-            for key, val in modes.items():
-                if value.lower() == val:
-                    mode = key
-            if mode is None:
-                err = _('unknown stream mode, must be one '
-                        'of: {}'.format(list(modes.values())))
-                raise Exception(err)
-            cmd = __class__.pad([8, 0, mode], self.__cmd_len)
-            return __class__.echo(cmd, self._cmd(cmd))
+        modes = ['unicast', 'broadcast', 'tcp']
+        if value is not None:
+            value = __class__.str(value).lower()
+            try:
+                mode = modes.index(value)
+            except ValueError as exc:
+                raise ValueError(_('unknown stream mode - supported '
+                                   'modes: {}'.format(modes))) from exc
+            cmd = __class__.pad([8, 0, mode], self.cmd_len)
+            return __class__.echo(cmd, self.cmd(cmd))
 
         # Get.
-        mode = self._cmd(__class__.pad([8, 1], self.__cmd_len))[0] & 255
-        return modes.get(mode)
+        mode = self.cmd(__class__.pad([8, 1], self.cmd_len))[0] & 255
+        return modes[mode]
 
-    @property
-    def mode(self):
-        """Stream mode."""
-        return self.__cache['mode']
+    def base_port(self, value):
+        """Set device base port.
 
-    @mode.setter
-    def mode(self, value):
-        self.__backlog_('mode', value)
+        :param value: Port number.
 
-    def _firmware_(self):
+        The device default is 8085!
+        """
+        port = __class__.port(value)
+        cmd = bytes([14, 0]) + port.to_bytes(2, byteorder='little')
+        cmd = __class__.pad(cmd, self.cmd_len)
+        return __class__.echo(cmd, self.cmd(cmd))
+
+    def led(self):
+        """Flash the LED."""
+        cmd = [55, 0, 1]
+        cmd = __class__.pad(cmd, self.cmd_len)
+        return __class__.echo(cmd, self.cmd(cmd))
+
+    def hdcp(self):
+        """Get HDCP status."""
+        cmd = [5, 1]
+        cmd = __class__.pad(cmd, self.cmd_len)
+        return bool(self.cmd(cmd)[0] & 255)
+
+    def firmware(self):
         """Get firmware version."""
-        ret = self._cmd(__class__.pad([56, 1], self.__cmd_len))
+        ret = self.cmd(__class__.pad([56, 1], self.cmd_len))
         major, minor, revision = [
             ret[0] & 255,
             ret[1] & 255,
@@ -918,50 +693,54 @@ class Controller(object):
         ]
         return '{}.{}.{}'.format(major, minor, revision)
 
-    @property
-    def firmware(self):
-        """Firmware version."""
-        return self.__cache['firmware']
-
-    def _clients_(self):
+    def clients(self):
         """Client ID and total connected clients. """
-        ret = self._cmd(__class__.pad([50, 1], self.__cmd_len))
+        ret = self.cmd(__class__.pad([50, 1], self.cmd_len))
         return ret[0] & 255, ret[1] & 255
 
-    @property
-    def clients(self):
-        """Current client number and total connected clients."""
-        return self.__cache['clients']
+    def keepalive(self, value=None):
+        """Connection keepalive."""
+        cmd = [0]
+        cmd = __class__.pad(cmd, self.cmd_len)
+        return __class__.echo(cmd, self.cmd(cmd))
 
-    def _cache_(self):
-        """Initialise/Update cache."""
-        properties = {
-            'url': self._url_(),
-            'key': self._key_(),
-            'username': self._username_(),
-            'password': self._password_(),
-            'brightness': self._brightness_(),
-            'contrast': self._contrast_(),
-            'hue': self._hue_(),
-            'saturation': self._saturation_(),
-            'hdmi': self._hdmi_(),
-            'resolution': self._resolution_(),
-            'picture': self._picture_(),
-            'bitrate': self._bitrate_(),
-            'toggle': self._toggle_(),
-            'fps': self._fps_(),
-            'hdcp': self._hdcp_(),
-            'mode': self._mode_(),
-            'firmware': self._firmware_(),
-            'clients': self._clients_(),
+    def settings(self, settings=None):
+        """Set/Get settings.
+
+        param settings: Dictionary of settings.
+
+        Note, you must get settings before you can set them!
+        """
+        if settings is not None:
+            for name, value in settings.items():
+                method = getattr(self, '{}'.format(name))
+                if value:
+                    method(value)
+                else:
+                    method()
+
+        return {
+            'url': self.url(),
+            'key': self.key(),
+            'username': self.username(),
+            'password': self.password(),
+            'name': self.name(),
+            'brightness': self.brightness(),
+            'contrast': self.contrast(),
+            'hue': self.hue(),
+            'saturation': self.saturation(),
+            'hdmi': self.hdmi(),
+            'resolution': self.resolution(),
+            'picture': self.picture(),
+            'bitrate': self.bitrate(),
+            'toggle': self.toggle(),
+            'fps': self.fps(),
+            'hdcp': self.hdcp(),
+            'mode': self.mode(),
+            'firmware': self.firmware(),
+            'clients': self.clients(),
+            'address': self.addr,
+            'tcp': self.tcp,
+            'udp': self.udp,
+            'timeout': self.timeout,
         }
-        for key, value in properties.items():
-            self.__cache.update({
-                key: value,
-            })
-        return self.__cache
-
-    @property
-    def settings(self):
-        """Settings cache."""
-        return self.__cache

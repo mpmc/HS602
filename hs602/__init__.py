@@ -1,5 +1,3 @@
-"""HS602 Controller."""
-from hs602.Controller import Controller
-
-# Version.
-_VERSION_ = "0.3.1.dev1"
+"""HS602 capture utilities."""
+# Version
+_VERSION_ = "0.3.2.dev1"

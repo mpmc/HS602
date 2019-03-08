@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#  Example.py
+#  example.py
 #
 #  Copyright 2018 Mark Clarkstone <git@markclarkstone.co.uk>
 #
@@ -22,7 +22,7 @@
 #
 #
 import time
-import hs602
+from hs602.controller import Controller
 
 
 def main(*args):
@@ -37,9 +37,9 @@ def main(*args):
     # There is usually no need to set an addr (unless you have more than
     # one device or if none are discovered automatically).
     #
-    devices = hs602.Controller.discover()
+    devices = Controller.discover()
     try:
-        device = hs602.Controller(devices[0])
+        device = Controller(devices[0])
     except Exception as exc:
         raise Exception('No devices? Has it crashed?') from exc
 
@@ -56,7 +56,7 @@ def main(*args):
     device.led()
 
     # Set HDMI (True) or Analogue (False)
-    device.hdmi(True)
+    # device.hdmi(True)
 
     # Get input source.
     print('Input source: {}'.format('HDMI' if device.hdmi() else 'Analogue'))
@@ -75,7 +75,7 @@ def main(*args):
 
     # Set picture settings - Uncomment (remove "# " to execute).
     # 0 - 255, default 128.
-    # device.picture(1920, 1080)
+    # device.picture("1920, 1080")
     # device.brightness(128)
     # device.contrast(128)
     # device.hue(128)
@@ -129,7 +129,7 @@ def main(*args):
         print('Stream will be available network wide on udp/rtp://@:8085\n'
               '\nWarning, This is pretty much untested, and be aware that '
               'multicast to broadcast is bandwidth heavy and may swamp '
-              'your network. If this happens, use unicast instead.')
+              'your network. If this happens use unicast instead.')
 
     elif q == 't':
         choice = 'tcp'

@@ -34,20 +34,22 @@ gettext.install('hs602_controller')
 
 class Controller(object):
     """Controller for HS602-based devices."""
-    def __init__(self, addr, **kwargs):
+    def __init__(self, addr, tcp=8087, udp=8086, listen=8085,
+                 timeout=10, cmd_len=15):
         """
         :param addr: Address of device.
         :param tcp: TCP command port - default 8087.
         :param udp: UDP broadcast port - default 8086.
         :param listen: Stream receive port - default 8085.
         :param timeout: Socket timeout - default 10.
+        :param cmd_len: Server-defined command length - default 15.
         """
         self.addr = str(addr)
-        self.tcp = int(kwargs.get('tcp', 8087))
-        self.udp = int(kwargs.get('udp', 8086))
-        self.listen = int(kwargs.get('listen', 8085))
-        self.timeout = int(kwargs.get('timeout', 10))
-        self.cmd_len = int(kwargs.get('cmd_len', 15))
+        self.tcp = int(tcp)
+        self.udp = int(udp)
+        self.listen = int(listen)
+        self.timeout = int(timeout)
+        self.cmd_len = int(cmd_len)
 
         self.socket = None
 
@@ -135,6 +137,9 @@ class Controller(object):
         :param encoding: Message encoding.
         """
         msg = __class__.bytes(msg, encoding)
+        port = __class__.port(port)
+        timeout = __class__.int(timeout)
+
         with __class__.sock(addr='', port=port, timeout=timeout,
                             udp=True) as sock:
             replies = list()
@@ -171,6 +176,7 @@ class Controller(object):
         """
         port = __class__.port(port)
         timeout = __class__.int(timeout)
+
         try:
             if udp:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -196,22 +202,23 @@ class Controller(object):
             raise Exception(_('can\'t connect or bind')) from exc
 
     @staticmethod
-    def discover(**kwargs):
+    def discover(encoding='utf-8', ping='HS602', pong='YES',
+                 broadcast='<broadcast>', udp=8086):
         """Get a list of available devices.
 
+        :param encoding: Message encoding - default 'utf-8'.
         :param ping: Ping message - default 'HS602'.
         :param pong: Pong message - default 'YES'.
-        :param encoding: Message encoding - default 'utf-8'.
         :param broadcast: Address to send message - default
         '<broadcast>'.
-        :param udp: Port on which to send message - default
-        8086.
+        :param udp: Port on which to send message - default 8086.
+
         """
-        broadcast = str(kwargs.get('broadcast', '<broadcast>'))
-        encoding = str(kwargs.get('encoding', 'utf-8'))
-        udp = int(kwargs.get('udp', 8086))
-        ping = __class__.bytes(kwargs.get('ping') or 'HS602', encoding)
-        pong = __class__.bytes(kwargs.get('pong') or 'YES', encoding)
+        encoding = str(encoding)
+        ping = __class__.bytes(ping, encoding)
+        pong = __class__.bytes(pong, encoding)
+        broadcast = __class__.str(broadcast)
+        udp = __class__.port(udp)
 
         try:
             ret = __class__.udp_msg(addr=broadcast, port=udp, msg=ping,
@@ -220,7 +227,7 @@ class Controller(object):
             raise Exception('discovery failure') from exc
         return [rep[0] for rep in ret if rep[2] == pong]
 
-    def cmd(self, msg, **kwargs):
+    def cmd(self, msg, new=False):
         """Send command to device.
 
         :param msg: Command message.
@@ -228,26 +235,27 @@ class Controller(object):
         """
         msg = __class__.bytes(msg)
         data_len = self.cmd_len
+        addr = __class__.str(self.addr)
+        udp = __class__.port(self.udp)
+        tcp = __class__.port(self.tcp)
+        timeout = __class__.int(self.timeout)
 
-        # We need an address!
-        if not self.addr:
-            raise ValueError(_('an address is required'))
+        addr = socket.gethostbyname(addr)
+        ip = reversed(addr.split('.'))
+        knock = [67] + [int(octal) for octal in ip]
 
         # Do we require a new socket?
-        if not self.socket or kwargs.get('new', False):
+        if not self.socket or new:
             try:
                 # Knock.
-                addr = socket.gethostbyname(self.addr)
-                ip = reversed(addr.split('.'))
-                knock = [67] + [int(octal) for octal in ip]
-                __class__.udp_msg(addr=addr, port=self.udp, msg=knock,
+                __class__.udp_msg(addr=addr, port=udp, msg=knock,
                                   reply=False)
             except Exception as exc:
                 raise Exception(_('failed to knock device')) from exc
 
             # Connect!
-            self.socket = __class__.sock(addr=self.addr, port=self.tcp,
-                                         timeout=self.timeout)
+            self.socket = __class__.sock(addr=addr, port=tcp,
+                                         timeout=timeout)
         try:
             # Send!
             self.socket.sendall(msg, 0)
@@ -357,6 +365,11 @@ class Controller(object):
         if not resolutions.get(ret):
             raise Exception(_('server returned unknown resolution'))
         return resolutions.get(ret)
+
+    def keepalive(self):
+        """Send keepalive message"""
+        cmd = __class__.pad([0], self.cmd_len)
+        return __class__.echo(cmd, self.cmd(cmd))
 
     def hdmi(self, hdmi=None):
         """Get/Set source input - HDMI or Analogue.

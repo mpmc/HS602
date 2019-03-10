@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 #  setup.py
@@ -37,7 +37,7 @@ setup(
     include_package_data=True,
     entry_points={
         'console_scripts': [
-            'hs602-example = hs602.Example:main',
+            'hs602-example = hs602.example:__main__',
         ]
     },
     install_requires=[''],

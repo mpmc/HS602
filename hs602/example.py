@@ -41,7 +41,8 @@ def main(*args):
     try:
         device = Controller(devices[0])
     except Exception as exc:
-        raise Exception('No devices? Has it crashed?') from exc
+        raise Exception('No device? Perhaps it/they\'ve '
+                        'crashed?') from exc
 
     # Device firmware version.
     print("Device firmware version: {}".format(device.firmware()))

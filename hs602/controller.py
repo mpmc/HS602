@@ -24,7 +24,6 @@
 import socket
 import gettext
 try:
-    import queue
     import concurrent.futures
 except ImportError:
     pass
@@ -52,6 +51,15 @@ class Controller(object):
         self.cmd_len = int(cmd_len)
 
         self.socket = None
+        self.executor = None
+
+        # Only initialise if available.
+        try:
+            self.executor = concurrent.futures.ThreadPoolExecutor()
+        except NameError:
+            pass
+        else:
+            self.executor.__init__(max_workers=1)
 
     @staticmethod
     def str(value):
@@ -190,7 +198,6 @@ class Controller(object):
                 sock.setsockopt(socket.IPPROTO_TCP,
                                 socket.TCP_NODELAY, 1)
 
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.settimeout(timeout)
             if bind:

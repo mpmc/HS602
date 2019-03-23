@@ -40,22 +40,22 @@ Information and Python module (and soon a GUI) to control the HS602 capture devi
 
 ### Linux
 
-1. Once installed via pip, make a copy of [```Example.py```](https://raw.githubusercontent.com/mpmc/HS602/master/hs602/Example.py).
-2. Modify it to your liking ```nano Examply.py```.
-3. Run it! In your terminal, navigate to where your file is, e.g. ```cd ~/Example.py```, chmod it ```chmod +x Example.py``` then run ```./Example.py```.
+1. Once installed via pip, make a copy of [```example.py```](https://raw.githubusercontent.com/mpmc/HS602/master/hs602/example.py).
+2. Modify it to your liking ```nano examply.py```.
+3. Run it! In your terminal, navigate to where your file is, e.g. ```cd ~/example.py```, chmod it ```chmod +x example.py``` then run ```./example.py```.
 
 ### Windows:
 
-1. Make a copy of [```Example.py```](https://raw.githubusercontent.com/mpmc/HS602/master/hs602/Example.py) and place it somewhere you can easily find it, then right click and choose *Edit with Python IDLE.*
+1. Make a copy of [```example.py```](https://raw.githubusercontent.com/mpmc/HS602/master/hs602/example.py) and place it somewhere you can easily find it, then right click and choose *Edit with Python IDLE.*
 2. Modify it to your liking.
 3. Run it! In Python IDLE, click *Run -> Check Module*  then *Run -> Run Module*.
 
-If you get ```ModuleNotFoundError: No module named 'hs602'``` you need to copy ```Example.py``` to the same location as the hs602 (folder).
+If you get ```ModuleNotFoundError: No module named 'hs602'``` you need to copy ```example.py``` to the same location as the hs602 (folder).
 
 ```
 /hs602
-/hs602/Copy_of_Example.py
-/hs602/hs602/Controller.py
+/hs602/copy_of_example.py
+/hs602/hs602/controller.py
 ```
 
 ## Improvements?

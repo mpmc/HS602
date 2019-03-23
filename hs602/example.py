@@ -38,6 +38,7 @@ def main(*args):
     # one device or if none are discovered automatically).
     #
     devices = Controller.discover()
+
     try:
         device = Controller(devices[0])
     except Exception as exc:

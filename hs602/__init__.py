@@ -1,3 +1,3 @@
 """HS602 capture utilities."""
 # Version
-_VERSION_ = "0.3.2.dev2"
+_VERSION_ = "0.3.2.dev3"

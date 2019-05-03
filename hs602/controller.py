@@ -23,17 +23,13 @@
 #
 import socket
 import gettext
-try:
-    import concurrent.futures
-except ImportError:
-    pass
 
 gettext.install('hs602_controller')
 
 
 class Controller(object):
     """Controller for HS602-based devices."""
-    def __init__(self, addr, tcp=8087, udp=8086, listen=8085,
+    def __init__(self, addr=None, tcp=8087, udp=8086, listen=8085,
                  timeout=10, cmd_len=15):
         """
         :param addr: Address of device.
@@ -51,15 +47,7 @@ class Controller(object):
         self.cmd_len = int(cmd_len)
 
         self.socket = None
-        self.executor = None
-
-        # Only initialise if available.
-        try:
-            self.executor = concurrent.futures.ThreadPoolExecutor()
-        except NameError:
-            pass
-        else:
-            self.executor.__init__(max_workers=1)
+        self.udp_socket = None
 
     @staticmethod
     def str(value):
@@ -113,7 +101,6 @@ class Controller(object):
         :param data: Data to pad, must be a list.
         :param pad: Size required - default 15.
         """
-
         pad = __class__.int(pad)
         data = bytes(data)
         return data.ljust(pad, b'\0')
@@ -131,46 +118,6 @@ class Controller(object):
             pass
         value = bytes(value)
         return value
-
-    @staticmethod
-    def udp_msg(addr, port, msg, reply=True, timeout=5,
-                encoding='utf-8'):
-        """Send a UDP message.
-
-        :param addr: Host address.
-        :param port: Port to send the message on.
-        :param msg: Message to send (will be converted to bytes).
-        :param reply: Reply needed?
-        :param timeout: Socket timeout.
-        :param encoding: Message encoding.
-        """
-        msg = __class__.bytes(msg, encoding)
-        port = __class__.port(port)
-        timeout = __class__.int(timeout)
-
-        with __class__.sock(addr='', port=port, timeout=timeout,
-                            udp=True) as sock:
-            replies = list()
-            sent = 0
-            while True:
-                # Send message.
-                if msg:
-                    sent = sock.sendto(msg, (addr, port))
-                    if not sent > 0:
-                        break
-                    msg = msg[sent:]
-                    continue
-
-                # Receive message?
-                if not reply:
-                    return True
-                try:
-                    data, [addr, port] = sock.recvfrom(2048)
-                    replies += [[addr, port, data]]
-                except (socket.error, socket.gaierror,
-                        socket.herror, socket.timeout, OSError):
-                    break
-            return replies
 
     @staticmethod
     def sock(addr, port, timeout, bind=False, udp=False):
@@ -209,30 +156,61 @@ class Controller(object):
             raise Exception(_('can\'t connect or bind')) from exc
 
     @staticmethod
-    def discover(encoding='utf-8', ping='HS602', pong='YES',
-                 broadcast='<broadcast>', udp=8086):
-        """Get a list of available devices.
+    def socket_shutdown(sock):
+        """Shutdown a given socket.
 
-        :param encoding: Message encoding - default 'utf-8'.
-        :param ping: Ping message - default 'HS602'.
-        :param pong: Pong message - default 'YES'.
-        :param broadcast: Address to send message - default
-        '<broadcast>'.
-        :param udp: Port on which to send message - default 8086.
-
+        :param sock: Socket to shutdown.
         """
-        encoding = str(encoding)
-        ping = __class__.bytes(ping, encoding)
-        pong = __class__.bytes(pong, encoding)
-        broadcast = __class__.str(broadcast)
-        udp = __class__.port(udp)
-
         try:
-            ret = __class__.udp_msg(addr=broadcast, port=udp, msg=ping,
-                                    encoding=encoding)
-        except Exception as exc:
-            raise Exception('discovery failure') from exc
-        return [rep[0] for rep in ret if rep[2] == pong]
+            # If this fails we can ignore it.
+            sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
+        except Exception:
+            pass
+        sock = None
+
+    def udp_msg(self, addr, port, msg, reply=True, timeout=5,
+                encoding='utf-8'):
+        """Send a UDP message.
+
+        :param addr: Host address.
+        :param port: Port to send the message on.
+        :param msg: Message to send (will be converted to bytes).
+        :param reply: Reply needed?
+        :param timeout: Socket timeout.
+        :param encoding: Message encoding.
+        """
+        msg = __class__.bytes(msg, encoding)
+        port = __class__.port(port)
+        timeout = __class__.int(timeout)
+
+        self.udp_socket = __class__.sock(addr='', port=port,
+                                         timeout=timeout, udp=True)
+
+        replies = list()
+        sent = 0
+        while True:
+            # Send message.
+            if msg:
+                sent = self.udp_socket.sendto(msg, (addr, port))
+                if not sent > 0:
+                    break
+                msg = msg[sent:]
+                continue
+
+            # Receive message?
+            if not reply:
+                return
+            try:
+                data, [addr, port] = self.udp_socket.recvfrom(2048)
+                replies += [[addr, port, data]]
+            except (socket.error, socket.gaierror,
+                    socket.herror, socket.timeout, OSError):
+                break
+
+        # Make sure the socket is completely cleaned up.
+        self.socket_shutdown(self.udp_socket)
+        return replies
 
     def cmd(self, msg, new=False):
         """Send command to device.
@@ -255,10 +233,10 @@ class Controller(object):
         if not self.socket or new:
             try:
                 # Knock.
-                __class__.udp_msg(addr=addr, port=udp, msg=knock,
-                                  reply=False)
+                self.udp_msg(addr=addr, port=udp, msg=knock,
+                             reply=False)
             except Exception as exc:
-                raise Exception(_('failed to knock device')) from exc
+                raise Exception(_('failed to knock')) from exc
 
             # Connect!
             self.socket = __class__.sock(addr=addr, port=tcp,
@@ -272,27 +250,23 @@ class Controller(object):
                 # Receive reply.
                 buf = self.socket.recv(1024)
                 if not buf:
-                    raise OSError(_('socket dead'))
+                    raise OSError(_('command socket dead'))
                 data += buf
                 # Return the response.
                 if len(data) >= data_len:
                     return data
         except Exception as exc:
-            self.close()
-            raise Exception(_('failed to send command')) from exc
+            # Close the socket.
+            self.socket_shutdown(self.socket)
+            raise Exception(_('failed to receive and/or send '
+                              'command')) from exc
 
-    def close(self):
-        """Close connection(s)."""
-        try:
-            # If this fails we can ignore it.
-            self.socket.shutdown(socket.SHUT_RDWR)
-            self.socket.close()
-        except (socket.error, socket.gaierror, socket.herror,
-                socket.timeout, OSError, AttributeError):
-            pass
-        self.socket = None
+    def shutdown(self):
+        """Shutdown thread(s) and connection(s)."""
+        self.socket_shutdown(self.udp_socket)
+        self.socket_shutdown(self.socket)
 
-    stop = close
+    __del__ = stop = close = shutdown
 
     def led(self):
         """Flash LED."""
@@ -378,7 +352,7 @@ class Controller(object):
         cmd = __class__.pad([0], self.cmd_len)
         return __class__.echo(cmd, self.cmd(cmd))
 
-    def hdmi(self, hdmi=None):
+    def source(self, hdmi=None):
         """Get/Set source input - HDMI or Analogue.
 
         :param hdmi: True for HDMI, False for analogue.
@@ -398,7 +372,7 @@ class Controller(object):
 
             cmd = __class__.pad(cmd, self.cmd_len)
             self.cmd(cmd)
-            return True
+            return self.source()
 
         return ret
 
@@ -495,6 +469,10 @@ class Controller(object):
 
         :param new_value: RTMP name to set.
         """
+        # Version 56 of the firmware doesn't support channel name.
+        if self.firmware().startswith('56'):
+            return ''
+
         if new_value is not None:
             return self.rtmp('name', new_value)
         return self.rtmp('name')
@@ -694,7 +672,7 @@ class Controller(object):
             ret_val = new_value
         return ret_val
 
-    def toggle(self, toggle=False):
+    def streaming(self, toggle=False):
         """Get/Set RTMP stream state.
 
         :param toggle: Set to toggle RTMP streaming state.
@@ -709,7 +687,7 @@ class Controller(object):
             if not __class__.echo(cmd, self.cmd(cmd)):
                 raise Exception(_('server rejected toggling stream '
                                   'state'))
-            return True
+            return self.streaming()
         return ret
 
     def fps(self, new_value=None):
@@ -736,7 +714,7 @@ class Controller(object):
                                   self.cmd_len):
                 raise Exception(_('server rejected new fps {}')
                                 .format(new_value))
-            return True
+            return new_value
 
         return ret
 
@@ -768,8 +746,7 @@ class Controller(object):
             if not __class__.echo(cmd, self.cmd(cmd)):
                 raise Exception(_('server rejected new stream mode {}')
                                 .format(orig_val))
-            return True
-
+            return orig_val
         return ret
 
     def base_port(self, new_value):
@@ -783,3 +760,91 @@ class Controller(object):
         cmd = bytes([14, 0]) + port.to_bytes(2, byteorder='little')
         cmd = __class__.pad(cmd, self.cmd_len)
         return __class__.echo(cmd, self.cmd(cmd))
+
+    def discover(self, encoding='utf-8', ping='HS602', pong='YES',
+                 broadcast='<broadcast>', udp=8086):
+        """Get a list of available devices.
+
+        :param encoding: Message encoding - default 'utf-8'.
+        :param ping: Ping message - default 'HS602'.
+        :param pong: Pong message - default 'YES'.
+        :param broadcast: Address to send message - default
+        '<broadcast>'.
+        :param udp: Port on which to send message - default 8086.
+
+        """
+        encoding = str(encoding)
+        ping = __class__.bytes(ping, encoding)
+        pong = __class__.bytes(pong, encoding)
+        broadcast = __class__.str(broadcast)
+        udp = __class__.port(udp)
+
+        try:
+            ret = self.udp_msg(addr=broadcast, port=udp, msg=ping,
+                               encoding=encoding)
+        except Exception as exc:
+            raise Exception('discovery failure') from exc
+        return [rep[0] for rep in ret if rep[2] == pong]
+
+    def settings(self, **kwargs):
+        """Get all/Set settings.
+
+        :param kwargs: (optional) keyword args [with values] to update.
+
+        The passed keyword args should be class method names, for
+        example settings(fps=60, username=demo ...)
+        """
+        read_only = [
+            'resolution',
+            'clients',
+            'firmware',
+            'hdcp',
+        ]
+        modifiable = [
+            'mode',
+            'fps',
+            'streaming',
+            'bitrate',
+            'picture',
+            'saturation',
+            'hue',
+            'contrast',
+            'brightness',
+            'username',
+            'password',
+            'key',
+            'url',
+            'name',
+            'source',
+        ]
+        settings = {}
+
+        for method_name in read_only + modifiable:
+            method_name = '{}'.format(method_name).lower()
+            method = getattr(self, method_name, None)
+            value = None
+            if not method:
+                continue
+
+            # Do we have a value to pass along?
+            try:
+                value = kwargs[method_name]
+            except KeyError:
+                pass
+            # Read only methods do not accept a value!
+            if method_name in read_only:
+                settings[method_name] = method()
+                continue
+
+            settings[method_name] = method(value)
+
+        # Add misc keys & values.
+        settings.update({
+            'addr': self.addr,
+            'tcp': self.tcp,
+            'udp': self.udp,
+            'listen': self.listen,
+            'timeout': self.timeout,
+            'len': self.cmd_len,
+        })
+        return settings

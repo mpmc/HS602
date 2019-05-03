@@ -24,7 +24,6 @@
 import time
 from hs602.controller import Controller
 
-
 def main(*args):
     input('This is an example script to control the HS602 capture '
           'device..\nPress enter to continue, or ctrl+c to exit.')
@@ -37,7 +36,8 @@ def main(*args):
     # There is usually no need to set an addr (unless you have more than
     # one device or if none are discovered automatically).
     #
-    devices = Controller.discover()
+    controller = Controller()
+    devices = controller.discover()
 
     try:
         device = Controller(devices[0])
@@ -58,10 +58,10 @@ def main(*args):
     device.led()
 
     # Set HDMI (True) or Analogue (False)
-    # device.hdmi(True)
+    # device.source(True)
 
     # Get input source.
-    print('Input source: {}'.format('HDMI' if device.hdmi() else 'Analogue'))
+    print('Input source: {}'.format(device.source()))
 
     # Get input resolution.
     print('Input resolution: {}'.format(device.resolution()))
@@ -114,7 +114,7 @@ def main(*args):
     # You can set any value here, uncomment (remove # to execute).
     # device.toggle(True)
 
-    toggle = 'Yes ' if device.toggle() else 'No'
+    toggle = 'Yes ' if device.streaming() else 'No'
     print('Streaming to RTMP server: {}'.format(toggle))
 
     print(''.ljust(80, '-'))

@@ -152,7 +152,7 @@ class Controller(object):
             else:
                 sock.connect((__class__.str(addr), port))
             return sock
-        except Exception as exc:
+        except OSError as exc:
             raise Exception(_('can\'t connect or bind')) from exc
 
     @staticmethod
@@ -165,7 +165,7 @@ class Controller(object):
             # If this fails we can ignore it.
             sock.shutdown(socket.SHUT_RDWR)
             sock.close()
-        except Exception:
+        except (OSError, AttributeError):
             pass
         sock = None
 
@@ -821,10 +821,8 @@ class Controller(object):
 
         for method_name in read_only + modifiable:
             method_name = '{}'.format(method_name).lower()
-            method = getattr(self, method_name, None)
+            method = getattr(self, method_name)
             value = None
-            if not method:
-                continue
 
             # Do we have a value to pass along?
             try:

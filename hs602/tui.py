@@ -14,6 +14,4 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with hs602.  If not, see <http://www.gnu.org/licenses/>.
-"""HS602 capture utilities."""
-# Version
-_VERSION_ = "0.3.4.dev1"
+

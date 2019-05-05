@@ -705,10 +705,10 @@ class Controller(object):
                 new_value = 60
             new_value = round(int(new_value))
             fps = [
-                value & 255,
-                (value >> 8) & 255,
-                (value >> 16) & 255,
-                (value >> 24) & 255,
+                new_value & 255,
+                (new_value >> 8) & 255,
+                (new_value >> 16) & 255,
+                (new_value >> 24) & 255,
             ]
             if not __class__.echo(__class__.pad([19, 0] + fps),
                                   self.cmd_len):

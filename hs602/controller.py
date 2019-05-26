@@ -14,7 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with hs602.  If not, see <http://www.gnu.org/licenses/>.
-
 import socket
 import gettext
 
@@ -39,9 +38,7 @@ class Controller(object):
         self.listen = int(listen)
         self.timeout = int(timeout)
         self.cmd_len = int(cmd_len)
-
         self.socket = None
-        self.udp_socket = None
 
     @staticmethod
     def str(value):
@@ -152,7 +149,6 @@ class Controller(object):
     @staticmethod
     def socket_shutdown(sock):
         """Shutdown a given socket.
-
         :param sock: Socket to shutdown.
         """
         try:
@@ -163,7 +159,8 @@ class Controller(object):
             pass
         sock = None
 
-    def udp_msg(self, addr, port, msg, reply=True, timeout=5,
+    @staticmethod
+    def udp_msg(addr, port, msg, reply=True, timeout=5,
                 encoding='utf-8'):
         """Send a UDP message.
 
@@ -178,36 +175,64 @@ class Controller(object):
         port = __class__.port(port)
         timeout = __class__.int(timeout)
 
-        self.udp_socket = __class__.sock(addr='', port=port,
-                                         timeout=timeout, udp=True)
+        sock = __class__.sock(addr='', port=port, timeout=timeout,
+                              udp=True)
+        with sock as sock:
+            replies = list()
+            sent = 0
+            while True:
+                # Send message.
+                if msg:
+                    sent = sock.sendto(msg, (addr, port))
+                    if not sent > 0:
+                        break
+                    msg = msg[sent:]
+                    continue
 
-        replies = list()
-        sent = 0
-        while True:
-            # Send message.
-            if msg:
-                sent = self.udp_socket.sendto(msg, (addr, port))
-                if not sent > 0:
+                # Receive message?
+                if not reply:
                     break
-                msg = msg[sent:]
-                continue
-
-            # Receive message?
-            if not reply:
-                return
-            try:
-                data, [addr, port] = self.udp_socket.recvfrom(2048)
-                replies += [[addr, port, data]]
-            except (socket.error, socket.gaierror,
-                    socket.herror, socket.timeout, OSError):
-                break
-
-        # Make sure the socket is completely cleaned up.
-        self.socket_shutdown(self.udp_socket)
+                try:
+                    data, [addr, port] = sock.recvfrom(2048)
+                    replies += [[addr, port, data]]
+                except (socket.error, socket.gaierror,
+                        socket.herror, socket.timeout, OSError):
+                    break
         return replies
 
+    @staticmethod
+    def discover(encoding='utf-8', ping='HS602', pong='YES',
+                 broadcast='<broadcast>', udp=8086):
+        """Get a list of available devices.
+
+        :param encoding: Message encoding - default 'utf-8'.
+        :param ping: Ping message - default 'HS602'.
+        :param pong: Pong message - default 'YES'.
+        :param broadcast: Address to send message - default
+        '<broadcast>'.
+        :param udp: Port on which to send message - default 8086.
+        """
+        encoding = str(encoding)
+        ping = __class__.bytes(ping, encoding)
+        pong = __class__.bytes(pong, encoding)
+        broadcast = __class__.str(broadcast)
+        udp = __class__.port(udp)
+
+        try:
+            ret = __class__.udp_msg(addr=broadcast, port=udp, msg=ping,
+                                    encoding=encoding)
+        except Exception as exc:
+            raise Exception('discovery failure') from exc
+        return [rep[0] for rep in ret if rep[2] == pong]
+
+    def shutdown(self):
+        """Shutdown."""
+        __class__.socket_shutdown(self.socket)
+
+    __del__ = shutdown
+
     def cmd(self, msg, new=False):
-        """Send command to device.
+        """Send command.
 
         :param msg: Command message.
         :param new: Force new socket.
@@ -233,34 +258,30 @@ class Controller(object):
                 raise Exception(_('failed to knock')) from exc
 
             # Connect!
+            self.shutdown()
             self.socket = __class__.sock(addr=addr, port=tcp,
                                          timeout=timeout)
-        try:
+        data = bytes()
+        sent = 0
+        while True:
             # Send!
-            self.socket.sendall(msg, 0)
-            data = bytes()
+            if msg:
+                sent = self.socket.send(msg[:self.cmd_len])
+                if not sent > 0:
+                    __class__.socket_shutdown(self.socket)
+                    raise OSError(_('send failed'))
+                msg = msg[sent:]
+                continue
 
-            while True:
-                # Receive reply.
-                buf = self.socket.recv(1024)
-                if not buf:
-                    raise OSError(_('command socket dead'))
-                data += buf
-                # Return the response.
-                if len(data) >= data_len:
-                    return data
-        except Exception as exc:
-            # Close the socket.
-            self.socket_shutdown(self.socket)
-            raise Exception(_('failed to receive and/or send '
-                              'command')) from exc
-
-    def shutdown(self):
-        """Shutdown thread(s) and connection(s)."""
-        self.socket_shutdown(self.udp_socket)
-        self.socket_shutdown(self.socket)
-
-    __del__ = stop = close = shutdown
+            # Receive reply.
+            buf = self.socket.recv(1024)
+            if not buf:
+                __class__.socket_shutdown(self.socket)
+                raise OSError(_('receive failed'))
+            data += buf
+            # Return the response.
+            if len(data) >= data_len:
+                return data
 
     def led(self):
         """Flash LED."""
@@ -750,31 +771,6 @@ class Controller(object):
         cmd = bytes([14, 0]) + port.to_bytes(2, byteorder='little')
         cmd = __class__.pad(cmd, self.cmd_len)
         return __class__.echo(cmd, self.cmd(cmd))
-
-    def discover(self, encoding='utf-8', ping='HS602', pong='YES',
-                 broadcast='<broadcast>', udp=8086):
-        """Get a list of available devices.
-
-        :param encoding: Message encoding - default 'utf-8'.
-        :param ping: Ping message - default 'HS602'.
-        :param pong: Pong message - default 'YES'.
-        :param broadcast: Address to send message - default
-        '<broadcast>'.
-        :param udp: Port on which to send message - default 8086.
-
-        """
-        encoding = str(encoding)
-        ping = __class__.bytes(ping, encoding)
-        pong = __class__.bytes(pong, encoding)
-        broadcast = __class__.str(broadcast)
-        udp = __class__.port(udp)
-
-        try:
-            ret = self.udp_msg(addr=broadcast, port=udp, msg=ping,
-                               encoding=encoding)
-        except Exception as exc:
-            raise Exception('discovery failure') from exc
-        return [rep[0] for rep in ret if rep[2] == pong]
 
     def settings(self, **kwargs):
         """Get all/Set settings.

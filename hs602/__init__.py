@@ -14,6 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with hs602.  If not, see <http://www.gnu.org/licenses/>.
-"""HS602 capture utilities."""
-# Version
-__version__ = __VERSION__ = "0.3.4.dev1"
+"""HS602 utilties."""
+# Version.
+__version__ = _version_ = __VERSION__ = _VERSION_ = "0.3.4.dev2"

@@ -14,9 +14,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with hs602.  If not, see <http://www.gnu.org/licenses/>.
-
 import time
 from hs602.controller import Controller
+
 
 def main(*args):
     input('This is an example script to control the HS602 capture '
@@ -36,8 +36,7 @@ def main(*args):
     try:
         device = Controller(devices[0])
     except Exception as exc:
-        raise Exception('No device? Perhaps it/they\'ve '
-                        'crashed?') from exc
+        raise Exception('No devices, maybe crashed?') from exc
 
     # Device firmware version.
     print("Device firmware version: {}".format(device.firmware()))
@@ -139,7 +138,7 @@ def main(*args):
     while True:
         device.keepalive()
         time.sleep(5)
-    # Done
+    # Done.
     input('Goodbye! Press any key to exit.')
 
 

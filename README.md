@@ -2,7 +2,7 @@
 
 Information and Python module (and soon a GUI) to control the HS602 capture device, manufactured by "maxmediatek" and sold under many different names/brands.
 
-* [Maplin Game Capture HD](http://www.maplin.co.uk/p/maplin-game-capture-hd-a84qu)  ("discontinued")
+* [Maplin Game Capture HD](https://web.archive.org/web/20170706154717/http://www.maplin.co.uk/p/maplin-game-capture-hd-a84qu)  ("discontinued")
 * [Startech USB2HDCAPS](https://www.startech.com/uk/AV/Converters/Video/standalone-video-capture-device~USB2HDCAPS)
 * [Diamond GameCaster HD "GC2000"](http://www.diamondmm.com/diamond-gc2000-video-capture-edit-stream.html)
 * [RATOC Game Recorder 2 REX-HDGCBOX2](http://www.ratocsystems.com/services/driver/visual/hdgcbox2_rgr.html)

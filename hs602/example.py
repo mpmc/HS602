@@ -63,7 +63,7 @@ def main(*args):
     print('Input HDCP: {}'.format(device.hdcp()))
 
     # Set frames-per-second -  Uncomment (remove "# " to execute).
-    device.fps(24)
+    # device.fps(60)
 
     # Get frames-per-second.
     print('FPS: {}'.format(device.fps()))

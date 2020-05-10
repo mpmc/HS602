@@ -377,7 +377,7 @@ class Controller(object):
         if ret not in [2, 3]:
             raise Exception(_('server returned invalid source id'))
 
-        ret = 'hdmi' if ret is 3 else 'analogue'
+        ret = 'hdmi' if ret == 3 else 'analogue'
 
         # Set.
         if hdmi is not None:
@@ -725,8 +725,11 @@ class Controller(object):
                 (new_value >> 16) & 255,
                 (new_value >> 24) & 255,
             ]
-            if not __class__.echo(__class__.pad([19, 0] + fps),
-                                  self.cmd_len):
+
+            cmd = __class__.pad([19, 0] + fps, self.cmd_len)
+            ret = self.cmd(cmd)
+
+            if not __class__.echo(cmd, ret):
                 raise Exception(_('server rejected new fps {}')
                                 .format(new_value))
             return new_value
@@ -736,7 +739,7 @@ class Controller(object):
     def mode(self, new_value=None):
         """Get/Set RTP/UDP stream mode.
 
-        :param new_value: new stream mode: unicast, broadcast, tcp.
+        :param new_value: New stream mode: unicast, broadcast, tcp.
         """
 
         modes = ['unicast', 'broadcast', 'tcp']
@@ -780,13 +783,13 @@ class Controller(object):
         The passed keyword args should be class method names, for
         example settings(fps=60, username=demo ...)
         """
-        read_only = [
+        read_only_methods = [
             'resolution',
             'clients',
             'firmware',
             'hdcp',
         ]
-        modifiable = [
+        modifiable_methods = [
             'mode',
             'fps',
             'streaming',
@@ -803,9 +806,9 @@ class Controller(object):
             'name',
             'source',
         ]
-        settings = {}
+        modifiable = read_only = {}
 
-        for method_name in read_only + modifiable:
+        for method_name in read_only_methods + modifiable_methods:
             method_name = '{}'.format(method_name).lower()
             method = getattr(self, method_name)
             value = None
@@ -815,15 +818,16 @@ class Controller(object):
                 value = kwargs[method_name]
             except KeyError:
                 pass
-            # Read only methods do not accept a value!
-            if method_name in read_only:
-                settings[method_name] = method()
+
+            # Read only methods do not accept a value.
+            if method_name in read_only_methods:
+                read_only[method_name] = method()
                 continue
 
-            settings[method_name] = method(value)
+            modifiable[method_name] = method(value)
 
         # Add misc keys & values.
-        settings.update({
+        read_only.update({
             'addr': self.addr,
             'tcp': self.tcp,
             'udp': self.udp,
@@ -831,4 +835,4 @@ class Controller(object):
             'timeout': self.timeout,
             'len': self.cmd_len,
         })
-        return settings
+        return read_only, modifiable

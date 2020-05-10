@@ -16,4 +16,4 @@
 # along with hs602.  If not, see <http://www.gnu.org/licenses/>.
 """HS602 utilties."""
 # Version.
-__version__ = _version_ = __VERSION__ = _VERSION_ = "0.3.4.dev2"
+__version__ = _version_ = __VERSION__ = _VERSION_ = "0.3.4.dev3"

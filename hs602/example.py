@@ -51,7 +51,7 @@ def main(*args):
     device.led()
 
     # Set HDMI (True) or Analogue (False)
-    # device.source(True)
+    device.source(True)
 
     # Get input source.
     print('Input source: {}'.format(device.source()))
@@ -62,11 +62,11 @@ def main(*args):
     # Get HDCP value.
     print('Input HDCP: {}'.format(device.hdcp()))
 
+    # Set frames-per-second -  Uncomment (remove "# " to execute).
+    device.fps(24)
+
     # Get frames-per-second.
     print('FPS: {}'.format(device.fps()))
-
-    # Set frames-per-second -  Uncomment (remove "# " to execute).
-    # device.fps = 60
 
     # Set picture settings - Uncomment (remove "# " to execute).
     # 0 - 255, default 128.
@@ -98,7 +98,7 @@ def main(*args):
     print('RTMP channel name: {}'.format(device.name()))
 
     # Set stream average bitrate - 500 - 20000.
-    device.bitrate(10000)
+    # device.bitrate(10000)
 
     # Get bitrate.
     print('Output bitrate: {}kbps'.format(device.bitrate()))

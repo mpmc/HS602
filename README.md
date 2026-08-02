@@ -8,8 +8,6 @@ Information and Python module (and soon a GUI) to control the HS602 capture devi
 * [RATOC Game Recorder 2 REX-HDGCBOX2](http://www.ratocsystems.com/services/driver/visual/hdgcbox2_rgr.html)
 * Skydigital Supercast T3 ([review](https://lpokeh.blogspot.com/2015/07/skydigital-t3-20-hdmi-review.html))
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/b1ee4a339ae24f919f12cee209f3bec0)](https://www.codacy.com/app/hello_58/HS602?utm_source=github.com&utm_medium=referral&utm_content=mpmc/HS602&utm_campaign=badger)
-
 ## Features
 
 * **Multi-platform** - works anywhere there's Python3!
